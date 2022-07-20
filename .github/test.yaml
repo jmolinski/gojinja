@@ -7,7 +7,7 @@ on:
     branches: [ 'master' ]
 
 jobs:
-  full_ci:
+  test:
     strategy:
       matrix:
         go_version: [ 1.18.x ]
