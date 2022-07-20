@@ -1,0 +1,32 @@
+name: test
+
+on:
+  pull_request:
+    branches: [ 'master' ]
+  workflow_dispatch:
+    branches: [ 'master' ]
+
+jobs:
+  full_ci:
+    strategy:
+      matrix:
+        go_version: [ 1.18.x ]
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go_version }}
+        
+      - name: Run test
+        run: go test -race -json ./... > test.json
+
+      - name: Annotate tests
+        uses: guyarb/golang-test-annotations@v0.5.1
+        with:
+          test-results: test.json
