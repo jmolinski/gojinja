@@ -9,7 +9,22 @@ var newlineRe = regexp.MustCompile(`(\r\n|\r|\n)`)
 var whitespaceRe = regexp.MustCompile(`\s+`)
 var stringRe = regexp.MustCompile(`(?s)('([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)")`)
 var integerRe = regexp.MustCompile(`(?i)(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f])+|[1-9](_?\d)*|0(_?0)*)`)
-var floatRe = regexp.MustCompile(`(?i)(?<!\.)(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
+
+// Had to change original regex not to include lookbehind
+// float_re = re.compile(
+//    r"""
+//    (?<!\.)  # doesn't start with a .
+//    (\d+_)*\d+  # digits, possibly _ separated
+//    (
+//        (\.(\d+_)*\d+)?  # optional fractional part
+//        e[+\-]?(\d+_)*\d+  # exponent part
+//    |
+//        \.(\d+_)*\d+  # required fractional part
+//    )
+//    """,
+//    re.IGNORECASE | re.VERBOSE,
+//)
+var floatRe = regexp.MustCompile(`(?i)(?:^|[^.])(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
 
 func countNewlines(value string) int {
 	return len(newlineRe.FindAllString(value, -1))
@@ -29,15 +44,15 @@ type ruleWithLength struct {
 func compileRules(env *EnvLexerInformation) []rulePair {
 	rules := []ruleWithLength{
 		{len(env.CommentStartString),
-			TOKEN_COMMENT_BEGIN,
+			TokenCommentBegin,
 			regexp.QuoteMeta(env.CommentStartString),
 		},
 		{len(env.BlockStartString),
-			TOKEN_BLOCK_BEGIN,
+			TokenBlockBegin,
 			regexp.QuoteMeta(env.BlockStartString),
 		},
 		{len(env.VariableStartString),
-			TOKEN_VARIABLE_BEGIN,
+			TokenVariableBegin,
 			regexp.QuoteMeta(env.VariableStartString),
 		},
 	}
@@ -45,7 +60,7 @@ func compileRules(env *EnvLexerInformation) []rulePair {
 	if env.LineStatementPrefix != nil {
 		rules = append(rules, ruleWithLength{
 			len(*env.LineStatementPrefix),
-			TOKEN_LINESTATEMENT_BEGIN,
+			TokenLinestatementBegin,
 			`^[ \t\v]*` + regexp.QuoteMeta(*env.LineStatementPrefix),
 		})
 	}
@@ -53,7 +68,7 @@ func compileRules(env *EnvLexerInformation) []rulePair {
 	if env.LineCommentPrefix != nil {
 		rules = append(rules, ruleWithLength{
 			len(*env.LineCommentPrefix),
-			TOKEN_LINECOMMENT_BEGIN,
+			TokenLinecommentBegin,
 			`(?:^|(?<=\S))[^\S\r\n]*` + regexp.QuoteMeta(*env.LineCommentPrefix),
 		})
 	}
