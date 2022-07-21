@@ -20,8 +20,7 @@ func init() {
 	lexerCache, err = lru.New(50)
 
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "%w", err)
-		os.Exit(1)
+		panic(err)
 	}
 }
 
@@ -68,10 +67,10 @@ type rule struct {
 }
 
 type Lexer struct {
-	LStripBlocks        bool
-	NewlineSequence     string
-	KeepTrailingNewline bool
-	Rules               map[string][]rule
+	lStripBlocks        bool
+	newlineSequence     string
+	keepTrailingNewline bool
+	rules               map[string][]rule
 }
 
 func New(env *EnvLexerInformation) *Lexer {
@@ -106,10 +105,10 @@ func New(env *EnvLexerInformation) *Lexer {
 	byGrpCmd := "#bygroup"
 
 	return &Lexer{
-		LStripBlocks:        env.LStripBlocks,
-		NewlineSequence:     env.NewlineSequence,
-		KeepTrailingNewline: env.KeepTrailingNewline,
-		Rules: map[string][]rule{
+		lStripBlocks:        env.LStripBlocks,
+		newlineSequence:     env.NewlineSequence,
+		keepTrailingNewline: env.KeepTrailingNewline,
+		rules: map[string][]rule{
 			"root": {
 				{
 					c(fmt.Sprintf(`^(.*?)(?:%s)`, rootPartsRe)),
@@ -162,7 +161,7 @@ func New(env *EnvLexerInformation) *Lexer {
 }
 
 func (l Lexer) normalizeNewlines(value string) string {
-	return newlineRe.ReplaceAllString(value, l.NewlineSequence)
+	return newlineRe.ReplaceAllString(value, l.newlineSequence)
 }
 
 func (l *Lexer) Tokenize(source string, name *string, filename *string, state *string) (*TokenStream, error) {
@@ -245,7 +244,7 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 
 func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *string) (ret []tokenRaw, err error) {
 	lines := newlineRe.Split(source, -1)
-	if !l.KeepTrailingNewline && lines[len(lines)-1] == "" {
+	if !l.keepTrailingNewline && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 
@@ -262,7 +261,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 		}
 		st.Push(*state + "_begin")
 	}
-	stateTokens := l.Rules[*st.Peek()]
+	stateTokens := l.rules[*st.Peek()]
 	sourceLength := len(source)
 	balancingStack := stack.New[string]()
 	newlinesStripped := 0
@@ -312,7 +311,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					stripped := strings.TrimRightFunc(text, unicode.IsSpace)
 					newlinesStripped = strings.Count(text[len(stripped):], "\n")
 					groups = append([]string{stripped}, groups[1:]...)
-				} else if stripSign != "+" && l.LStripBlocks {
+				} else if stripSign != "+" && l.lStripBlocks {
 					names := sToks.pattern.SubexpNames()[1:]
 					variableExpression := false
 					for i := 0; i < len(names); i++ {
@@ -425,7 +424,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					st.Push(*sToks.command)
 				}
 
-				stateTokens = l.Rules[*st.Peek()]
+				stateTokens = l.rules[*st.Peek()]
 			} else if pos2 == pos {
 				// we are still at the same position and no stack change.
 				// this means a loop without break condition, avoid that and
