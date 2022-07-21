@@ -1,6 +1,9 @@
 package lexer
 
-import "regexp"
+import (
+	"regexp"
+	"sort"
+)
 
 var newlineRe = regexp.MustCompile(`(\r\n|\r|\n)`)
 var whitespaceRe = regexp.MustCompile(`\s+`)
@@ -10,4 +13,67 @@ var floatRe = regexp.MustCompile(`(?i)(?<!\.)(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\
 
 func countNewlines(value string) int {
 	return len(newlineRe.FindAllString(value, -1))
+}
+
+type rulePair struct {
+	name    string
+	pattern string
+}
+
+type ruleWithLength struct {
+	len     int
+	tok     string
+	pattern string
+}
+
+func compileRules(env *EnvLexerInformation) []rulePair {
+	rules := []ruleWithLength{
+		{len(env.CommentStartString),
+			TOKEN_COMMENT_BEGIN,
+			regexp.QuoteMeta(env.CommentStartString),
+		},
+		{len(env.BlockStartString),
+			TOKEN_BLOCK_BEGIN,
+			regexp.QuoteMeta(env.BlockStartString),
+		},
+		{len(env.VariableStartString),
+			TOKEN_VARIABLE_BEGIN,
+			regexp.QuoteMeta(env.VariableStartString),
+		},
+	}
+
+	if env.LineStatementPrefix != nil {
+		rules = append(rules, ruleWithLength{
+			len(*env.LineStatementPrefix),
+			TOKEN_LINESTATEMENT_BEGIN,
+			`^[ \t\v]*` + regexp.QuoteMeta(*env.LineStatementPrefix),
+		})
+	}
+
+	if env.LineCommentPrefix != nil {
+		rules = append(rules, ruleWithLength{
+			len(*env.LineCommentPrefix),
+			TOKEN_LINECOMMENT_BEGIN,
+			`(?:^|(?<=\S))[^\S\r\n]*` + regexp.QuoteMeta(*env.LineCommentPrefix),
+		})
+	}
+
+	sort.Slice(rules, func(i int, j int) bool {
+		r1 := rules[i]
+		r2 := rules[j]
+		if r1.len == r2.len {
+			if r1.tok == r2.tok {
+				return r1.pattern > r2.pattern
+			}
+			return r1.tok > r2.tok
+		}
+		return r1.len > r2.len
+	})
+
+	ret := make([]rulePair, 0, len(rules))
+	for _, r := range rules {
+		ret = append(ret, rulePair{r.tok, r.pattern})
+	}
+
+	return ret
 }

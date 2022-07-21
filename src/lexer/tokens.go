@@ -2,9 +2,11 @@ package lexer
 
 import (
 	"fmt"
+	"github.com/gojinja/gojinja/src/utils/maps"
 	"github.com/gojinja/gojinja/src/utils/set"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -104,7 +106,15 @@ func rev(ops map[string]string) map[string]string {
 var operatorRe = getOperatorRe(operators)
 
 func getOperatorRe(ops map[string]string) *regexp.Regexp {
-	return nil
+	els := maps.Keys(ops)
+	sort.Slice(els, func(i int, j int) bool {
+		return len(els[i]) > len(els[j])
+	})
+	for i, el := range els {
+		els[i] = regexp.QuoteMeta(el)
+	}
+	pat := strings.Join(els, "|")
+	return regexp.MustCompile(pat)
 }
 
 var ignoredTokens = set.FrozenFromElems(
@@ -161,7 +171,7 @@ func describeTokenType(tokenType string) string {
 
 func DescribeToken(token Token) string {
 	if token.type_ == TOKEN_NAME {
-		return token.value
+		return fmt.Sprint(token.value)
 	}
 
 	return describeTokenType(token.type_)
@@ -181,7 +191,7 @@ func DescribeTokenExpr(expr string) string {
 type Token struct {
 	lineno int
 	type_  string
-	value  string
+	value  any
 }
 
 func (t Token) String() string {
