@@ -27,6 +27,7 @@ var integerRe = regexp.MustCompile(`(?i)(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f])
 var floatRe = regexp.MustCompile(`(?i)(?:^|[^.])(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
 
 func countNewlines(value string) int {
+	// TODO rewrite without regex as regexes are slow
 	return len(newlineRe.FindAllString(value, -1))
 }
 
