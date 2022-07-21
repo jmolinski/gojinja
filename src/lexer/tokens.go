@@ -10,83 +10,83 @@ import (
 	"strings"
 )
 
-const TOKEN_ADD = "add"
-const TOKEN_ASSIGN = "assign"
-const TOKEN_COLON = "colon"
-const TOKEN_COMMA = "comma"
-const TOKEN_DIV = "div"
-const TOKEN_DOT = "dot"
-const TOKEN_EQ = "eq"
-const TOKEN_FLOORDIV = "floordiv"
-const TOKEN_GT = "gt"
-const TOKEN_GTEQ = "gteq"
-const TOKEN_LBRACE = "lbrace"
-const TOKEN_LBRACKET = "lbracket"
-const TOKEN_LPAREN = "lparen"
-const TOKEN_LT = "lt"
-const TOKEN_LTEQ = "lteq"
-const TOKEN_MOD = "mod"
-const TOKEN_MUL = "mul"
-const TOKEN_NE = "ne"
-const TOKEN_PIPE = "pipe"
-const TOKEN_POW = "pow"
-const TOKEN_RBRACE = "rbrace"
-const TOKEN_RBRACKET = "rbracket"
-const TOKEN_RPAREN = "rparen"
-const TOKEN_SEMICOLON = "semicolon"
-const TOKEN_SUB = "sub"
-const TOKEN_TILDE = "tilde"
-const TOKEN_WHITESPACE = "whitespace"
-const TOKEN_FLOAT = "float"
-const TOKEN_INTEGER = "integer"
-const TOKEN_NAME = "name"
-const TOKEN_STRING = "string"
-const TOKEN_OPERATOR = "operator"
-const TOKEN_BLOCK_BEGIN = "block_begin"
-const TOKEN_BLOCK_END = "block_end"
-const TOKEN_VARIABLE_BEGIN = "variable_begin"
-const TOKEN_VARIABLE_END = "variable_end"
-const TOKEN_RAW_BEGIN = "raw_begin"
-const TOKEN_RAW_END = "raw_end"
-const TOKEN_COMMENT_BEGIN = "comment_begin"
-const TOKEN_COMMENT_END = "comment_end"
-const TOKEN_COMMENT = "comment"
-const TOKEN_LINESTATEMENT_BEGIN = "linestatement_begin"
-const TOKEN_LINESTATEMENT_END = "linestatement_end"
-const TOKEN_LINECOMMENT_BEGIN = "linecomment_begin"
-const TOKEN_LINECOMMENT_END = "linecomment_end"
-const TOKEN_LINECOMMENT = "linecomment"
-const TOKEN_DATA = "data"
-const TOKEN_INITIAL = "initial"
-const TOKEN_EOF = "eof"
+const TokenAdd = "add"
+const TokenAssign = "assign"
+const TokenColon = "colon"
+const TokenComma = "comma"
+const TokenDiv = "div"
+const TokenDot = "dot"
+const TokenEq = "eq"
+const TokenFloordiv = "floordiv"
+const TokenGt = "gt"
+const TokenGteq = "gteq"
+const TokenLbrace = "lbrace"
+const TokenLbracket = "lbracket"
+const TokenLparen = "lparen"
+const TokenLt = "lt"
+const TokenLteq = "lteq"
+const TokenMod = "mod"
+const TokenMul = "mul"
+const TokenNe = "ne"
+const TokenPipe = "pipe"
+const TokenPow = "pow"
+const TokenRbrace = "rbrace"
+const TokenRbracket = "rbracket"
+const TokenRparen = "rparen"
+const TokenSemicolon = "semicolon"
+const TokenSub = "sub"
+const TokenTilde = "tilde"
+const TokenWhitespace = "whitespace"
+const TokenFloat = "float"
+const TokenInteger = "integer"
+const TokenName = "name"
+const TokenString = "string"
+const TokenOperator = "operator"
+const TokenBlockBegin = "block_begin"
+const TokenBlockEnd = "block_end"
+const TokenVariableBegin = "variable_begin"
+const TokenVariableEnd = "variable_end"
+const TokenRawBegin = "raw_begin"
+const TokenRawEnd = "raw_end"
+const TokenCommentBegin = "comment_begin"
+const TokenCommentEnd = "comment_end"
+const TokenComment = "comment"
+const TokenLinestatementBegin = "linestatement_begin"
+const TokenLinestatementEnd = "linestatement_end"
+const TokenLinecommentBegin = "linecomment_begin"
+const TokenLinecommentEnd = "linecomment_end"
+const TokenLinecomment = "linecomment"
+const TokenData = "data"
+const TokenInitial = "initial"
+const TokenEof = "eof"
 
 var operators = map[string]string{
-	"+":  TOKEN_ADD,
-	"-":  TOKEN_SUB,
-	"/":  TOKEN_DIV,
-	"//": TOKEN_FLOORDIV,
-	"*":  TOKEN_MUL,
-	"%":  TOKEN_MOD,
-	"**": TOKEN_POW,
-	"~":  TOKEN_TILDE,
-	"[":  TOKEN_LBRACKET,
-	"]":  TOKEN_RBRACKET,
-	"(":  TOKEN_LPAREN,
-	")":  TOKEN_RPAREN,
-	"{":  TOKEN_LBRACE,
-	"}":  TOKEN_RBRACE,
-	"==": TOKEN_EQ,
-	"!=": TOKEN_NE,
-	">":  TOKEN_GT,
-	">=": TOKEN_GTEQ,
-	"<":  TOKEN_LT,
-	"<=": TOKEN_LTEQ,
-	"=":  TOKEN_ASSIGN,
-	".":  TOKEN_DOT,
-	":":  TOKEN_COLON,
-	"|":  TOKEN_PIPE,
-	",":  TOKEN_COMMA,
-	";":  TOKEN_SEMICOLON,
+	"+":  TokenAdd,
+	"-":  TokenSub,
+	"/":  TokenDiv,
+	"//": TokenFloordiv,
+	"*":  TokenMul,
+	"%":  TokenMod,
+	"**": TokenPow,
+	"~":  TokenTilde,
+	"[":  TokenLbracket,
+	"]":  TokenRbracket,
+	"(":  TokenLparen,
+	")":  TokenRparen,
+	"{":  TokenLbrace,
+	"}":  TokenRbrace,
+	"==": TokenEq,
+	"!=": TokenNe,
+	">":  TokenGt,
+	">=": TokenGteq,
+	"<":  TokenLt,
+	"<=": TokenLteq,
+	"=":  TokenAssign,
+	".":  TokenDot,
+	":":  TokenColon,
+	"|":  TokenPipe,
+	",":  TokenComma,
+	";":  TokenSemicolon,
 }
 
 var reverseOperators = rev(operators)
@@ -118,20 +118,20 @@ func getOperatorRe(ops map[string]string) *regexp.Regexp {
 }
 
 var ignoredTokens = set.FrozenFromElems(
-	TOKEN_COMMENT_BEGIN,
-	TOKEN_COMMENT,
-	TOKEN_COMMENT_END,
-	TOKEN_WHITESPACE,
-	TOKEN_LINECOMMENT_BEGIN,
-	TOKEN_LINECOMMENT_END,
-	TOKEN_LINECOMMENT,
+	TokenCommentBegin,
+	TokenComment,
+	TokenCommentEnd,
+	TokenWhitespace,
+	TokenLinecommentBegin,
+	TokenLinecommentEnd,
+	TokenLinecomment,
 )
 
 var ignoreIfEmpty = set.FrozenFromElems(
-	TOKEN_WHITESPACE,
-	TOKEN_DATA,
-	TOKEN_COMMENT,
-	TOKEN_LINECOMMENT,
+	TokenWhitespace,
+	TokenData,
+	TokenComment,
+	TokenLinecomment,
 )
 
 func describeTokenType(tokenType string) string {
@@ -140,29 +140,29 @@ func describeTokenType(tokenType string) string {
 	}
 
 	switch tokenType {
-	case TOKEN_COMMENT_BEGIN:
+	case TokenCommentBegin:
 		return "begin of comment"
-	case TOKEN_COMMENT_END:
+	case TokenCommentEnd:
 		return "end of comment"
-	case TOKEN_COMMENT:
+	case TokenComment:
 		return "comment"
-	case TOKEN_LINECOMMENT:
+	case TokenLinecomment:
 		return "comment"
-	case TOKEN_BLOCK_BEGIN:
+	case TokenBlockBegin:
 		return "begin of statement block"
-	case TOKEN_BLOCK_END:
+	case TokenBlockEnd:
 		return "end of statement block"
-	case TOKEN_VARIABLE_BEGIN:
+	case TokenVariableBegin:
 		return "begin of print statement"
-	case TOKEN_VARIABLE_END:
+	case TokenVariableEnd:
 		return "end of print statement"
-	case TOKEN_LINESTATEMENT_BEGIN:
+	case TokenLinestatementBegin:
 		return "begin of line statement"
-	case TOKEN_LINESTATEMENT_END:
+	case TokenLinestatementEnd:
 		return "end of line statement"
-	case TOKEN_DATA:
+	case TokenData:
 		return "template data / text"
-	case TOKEN_EOF:
+	case TokenEof:
 		return "end of template"
 	default:
 		return tokenType
@@ -170,7 +170,7 @@ func describeTokenType(tokenType string) string {
 }
 
 func DescribeToken(token Token) string {
-	if token.type_ == TOKEN_NAME {
+	if token.type_ == TokenName {
 		return fmt.Sprint(token.value)
 	}
 
@@ -180,7 +180,7 @@ func DescribeToken(token Token) string {
 func DescribeTokenExpr(expr string) string {
 	if strings.Contains(expr, ":") {
 		res := strings.SplitN(expr, ":", 1)
-		if res[0] == TOKEN_NAME {
+		if res[0] == TokenName {
 			return res[1]
 		}
 		return describeTokenType(res[0])
