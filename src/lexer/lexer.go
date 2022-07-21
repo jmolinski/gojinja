@@ -124,7 +124,7 @@ func New(env *EnvLexerInformation) *Lexer {
 					[]string{TokenComment, TokenCommentEnd},
 					&popCmd,
 				},
-				{c(`(.)`), "" /* TODO */, nil},
+				{c(`(.)`), Failure{"Missing end of comment tag"}, nil},
 			},
 			TokenBlockBegin: append([]rule{
 				{
@@ -152,7 +152,7 @@ func New(env *EnvLexerInformation) *Lexer {
 			}, tagRules...),
 			TokenLinecommentBegin: {
 				{
-					c(`(.*?)()(?=\n|$)`),
+					c(`(.*?)()(?:\n|$)`),
 					[]string{TokenLinecomment, TokenLinecommentEnd},
 					&popCmd,
 				},
