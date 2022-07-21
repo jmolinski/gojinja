@@ -112,47 +112,47 @@ func New(env *EnvLexerInformation) *Lexer {
 		Rules: map[string][]rule{
 			"root": {
 				{
-					c(fmt.Sprintf(`(.*?)(?:%s)`, rootPartsRe)),
+					c(fmt.Sprintf(`^(.*?)(?:%s)`, rootPartsRe)),
 					OptionalLStrip{data: []string{TokenData, byGrpCmd}},
 					&byGrpCmd,
 				}, // directives
-				{c(".+"), TokenData, nil}, // data
+				{c("^.+"), TokenData, nil}, // data
 			},
 			TokenCommentBegin: {
 				{
-					c(fmt.Sprintf(`(.*?)((?:\+%s|\-%s\s*|%s%s))`, commentEndRe, commentEndRe, commentEndRe, blockSuffixRe)),
+					c(fmt.Sprintf(`^(.*?)((?:\+%s|\-%s\s*|%s%s))`, commentEndRe, commentEndRe, commentEndRe, blockSuffixRe)),
 					[]string{TokenComment, TokenCommentEnd},
 					&popCmd,
 				},
-				{c(`(.)`), Failure{"Missing end of comment tag"}, nil},
+				{c(`^(.)`), Failure{"Missing end of comment tag"}, nil},
 			},
 			TokenBlockBegin: append([]rule{
 				{
-					c(fmt.Sprintf(`(?:\+%s|\-%s\s*|%s%s)`, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
+					c(fmt.Sprintf(`^(?:\+%s|\-%s\s*|%s%s)`, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
 					TokenBlockEnd,
 					&popCmd,
 				},
 			}, tagRules...),
 			TokenVariableBegin: append([]rule{
 				{
-					c(fmt.Sprintf(`\-%s\s*|%s`, variableEndRe, variableEndRe)),
+					c(fmt.Sprintf(`^\-%s\s*|^%s`, variableEndRe, variableEndRe)),
 					TokenVariableEnd,
 					&popCmd,
 				},
 			}, tagRules...),
 			TokenRawBegin: append([]rule{
 				{
-					c(fmt.Sprintf(`(.*?)((?:%s(\-|\+|))\s*endraw\s*(?:\+%s|\-%s\s*|%s%s))`, blockStartRe, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
+					c(fmt.Sprintf(`^(.*?)((?:%s(\-|\+|))\s*endraw\s*(?:\+%s|\-%s\s*|%s%s))`, blockStartRe, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
 					OptionalLStrip{data: []string{TokenData, TokenRawEnd}},
 					&popCmd,
 				},
 			}, tagRules...),
 			TokenLinestatementBegin: append([]rule{
-				{c(`\s*(\n|$)`), TokenLinestatementEnd, &popCmd},
+				{c(`^\s*(\n|$)`), TokenLinestatementEnd, &popCmd},
 			}, tagRules...),
 			TokenLinecommentBegin: {
 				{
-					c(`(.*?)()(?:\n|$)`),
+					c(`^(.*?)()(?:\n|$)`),
 					[]string{TokenLinecomment, TokenLinecommentEnd},
 					&popCmd,
 				},
@@ -253,6 +253,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 	pos := 0
 	lineno := 1
 	st := stack.New[string]()
+	st.Push("root")
 
 	if state != nil && *state != "root" {
 		if *state != "variable" && *state != "block" {
@@ -261,21 +262,24 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 		}
 		st.Push(*state + "_begin")
 	}
-
 	stateTokens := l.Rules[*st.Peek()]
 	sourceLength := len(source)
 	balancingStack := stack.New[string]()
 	newlinesStripped := 0
 	lineStarting := true
-	for {
-		broke := false
+
+	broke := true
+	for broke {
+		broke = false
 		// tokenizer loop
 		for _, sToks := range stateTokens {
 			// if no match we try again with the next rule
-			groups := sToks.pattern.FindStringSubmatch(source[:pos])
-			if groups == nil {
+			groups := sToks.pattern.FindStringSubmatch(source[pos:])
+			if len(groups) == 0 {
 				continue
 			}
+			grp := groups[0]
+			groups = groups[1:] // Remove first element as it's not in python counterpart.
 
 			// we only match blocks and variables if braces / parentheses
 			// are balanced. continue parsing with the lower rule which
@@ -309,7 +313,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					newlinesStripped = strings.Count(text[len(stripped):], "\n")
 					groups = append([]string{stripped}, groups[1:]...)
 				} else if stripSign != "+" && l.LStripBlocks {
-					names := sToks.pattern.SubexpNames()
+					names := sToks.pattern.SubexpNames()[1:]
 					variableExpression := false
 					for i := 0; i < len(names); i++ {
 						if names[i] == TokenVariableBegin && groups[i] != "" {
@@ -335,10 +339,10 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 						// bygroup is a bit more complex, in that case we
 						// yield for the current token the first named
 						// group that matched
-						names := sToks.pattern.SubexpNames()
+						names := sToks.pattern.SubexpNames()[1:]
 						found := false
 						for i := 0; i < len(names); i++ {
-							if groups[i] != "" {
+							if names[i] != "" && groups[i] != "" {
 								ret = append(ret, tokenRaw{lineno, names[i], groups[i]})
 								lineno += strings.Count(groups[i], "\n")
 								found = true
@@ -351,7 +355,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					} else {
 						// normal group
 						data := groups[idx]
-						if data != "" || !ignoredTokens.Has(token) {
+						if data != "" || !ignoreIfEmpty.Has(token) {
 							ret = append(ret, tokenRaw{lineno, token, data})
 						}
 						lineno += strings.Count(data, "\n") + newlinesStripped
@@ -362,7 +366,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 				return nil, failure.Error(lineno, filename)
 			} else if toks, ok := sToks.tokens.(string); ok {
 				// strings as token just are yielded as it.
-				data := groups[0]
+				data := grp
 				// update brace / parentheses balance
 				if toks == TokenOperator {
 					switch data {
@@ -380,23 +384,24 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 						if *exOp != data {
 							return nil, errors.TemplateSyntaxError(fmt.Sprintf("unexpected '%s', expected '%s'", data, *exOp), lineno, name, filename)
 						}
-						// yield items
-						if data != "" || !ignoreIfEmpty.Has(toks) {
-							ret = append(ret, tokenRaw{lineno, toks, data})
-						}
-						lineno += strings.Count(data, "\n")
 					}
 				}
+
+				// yield items
+				if data != "" || !ignoreIfEmpty.Has(toks) {
+					ret = append(ret, tokenRaw{lineno, toks, data})
+				}
+				lineno += strings.Count(data, "\n")
 			} else {
 				return nil, fmt.Errorf("unexpected type")
 			}
 
-			lineStarting = groups[0][len(groups[0])-1] == '\n'
+			lineStarting = grp[len(grp)-1] == '\n'
 			// fetch new position into new variable so that we can check
 			// if there is a internal parsing error which would result
 			// in an infinite loop
 			idx := sToks.pattern.FindAllStringSubmatchIndex(source[pos:], -1)
-			pos2 := idx[0][1]
+			pos2 := pos + idx[0][1]
 			// handle state changes
 			if sToks.command != nil {
 				// remove the uppermost state
@@ -404,10 +409,10 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					st.Pop()
 				} else if *sToks.command == "#bygroup" {
 					// resolve the new state by group checking
-					names := sToks.pattern.SubexpNames()
+					names := sToks.pattern.SubexpNames()[1:]
 					found := false
 					for i := 0; i < len(names); i++ {
-						if groups[i] != "" {
+						if names[i] != "" && groups[i] != "" {
 							st.Push(names[i])
 							found = true
 							break
@@ -432,15 +437,14 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 			broke = true
 			break
 		}
-		if !broke {
-			// if loop terminated without break we haven't found a single match
-			// either we are at the end of the file or we have a problem
-			if pos >= sourceLength {
-				return
-			}
-			return nil, errors.TemplateSyntaxError(fmt.Sprintf("unexpected char '%s' at %d", string(source[pos]), pos), lineno, name, filename)
-		}
 	}
+
+	// if loop terminated without break we haven't found a single match
+	// either we are at the end of the file or we have a problem
+	if pos >= sourceLength {
+		return
+	}
+	return nil, errors.TemplateSyntaxError(fmt.Sprintf("unexpected char '%s' at %d", string(source[pos]), pos), lineno, name, filename)
 }
 
 type Failure struct {

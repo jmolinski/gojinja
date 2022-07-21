@@ -6,9 +6,9 @@ import (
 )
 
 var newlineRe = regexp.MustCompile(`(\r\n|\r|\n)`)
-var whitespaceRe = regexp.MustCompile(`\s+`)
-var stringRe = regexp.MustCompile(`(?s)('([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)")`)
-var integerRe = regexp.MustCompile(`(?i)(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f])+|[1-9](_?\d)*|0(_?0)*)`)
+var whitespaceRe = regexp.MustCompile(`^\s+`)
+var stringRe = regexp.MustCompile(`(?s)^('([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)")`)
+var integerRe = regexp.MustCompile(`(?i)^(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f])+|[1-9](_?\d)*|0(_?0)*)`)
 
 // Had to change original regex not to include lookbehind
 // float_re = re.compile(
@@ -24,7 +24,7 @@ var integerRe = regexp.MustCompile(`(?i)(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f])
 //    """,
 //    re.IGNORECASE | re.VERBOSE,
 //)
-var floatRe = regexp.MustCompile(`(?i)(?:^|[^.])(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
+var floatRe = regexp.MustCompile(`(?i)^(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
 
 func countNewlines(value string) int {
 	// TODO rewrite without regex as regexes are slow
