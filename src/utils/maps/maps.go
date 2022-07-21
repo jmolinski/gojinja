@@ -13,7 +13,7 @@ func Keys[K comparable, V any](m map[K]V) []K {
 	return keys
 }
 
-func OrderedKeys[K constraints.Ordered, V any](m map[K]V) []K {
+func SortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
 	keys := Keys(m)
 	sort.Slice(keys, func(i int, j int) bool { return keys[i] < keys[j] })
 	return keys

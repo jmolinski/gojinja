@@ -120,7 +120,7 @@ func (f fsLoader) ListTemplates() ([]string, error) {
 			return nil, err
 		}
 	}
-	return maps.OrderedKeys(found), nil
+	return maps.SortedKeys(found), nil
 }
 
 func NewFileSystemLoader[S utils.StrOrSlice](searchPath S, encoding string, followLinks bool) *Loader {
