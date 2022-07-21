@@ -76,12 +76,12 @@ type Lexer struct {
 
 func New(env *EnvLexerInformation) *Lexer {
 	tagRules := []rule{
-		{whitespaceRe, TOKEN_WHITESPACE, nil},
-		{floatRe, TOKEN_FLOAT, nil},
-		{integerRe, TOKEN_INTEGER, nil},
-		{utils.NameRe, TOKEN_NAME, nil},
-		{stringRe, TOKEN_STRING, nil},
-		{operatorRe, TOKEN_OPERATOR, nil},
+		{whitespaceRe, TokenWhitespace, nil},
+		{floatRe, TokenFloat, nil},
+		{integerRe, TokenInteger, nil},
+		{utils.NameRe, TokenName, nil},
+		{stringRe, TokenString, nil},
+		{operatorRe, TokenOperator, nil},
 	}
 
 	rootTagRules := compileRules(env)
@@ -113,47 +113,47 @@ func New(env *EnvLexerInformation) *Lexer {
 			"root": {
 				{
 					c(fmt.Sprintf(`(.*?)(?:%s)`, rootPartsRe)),
-					OptionalLStrip{data: []string{TOKEN_DATA, byGrpCmd}},
+					OptionalLStrip{data: []string{TokenData, byGrpCmd}},
 					&byGrpCmd,
 				}, // directives
-				{c(".+"), TOKEN_DATA, nil}, // data
+				{c(".+"), TokenData, nil}, // data
 			},
-			TOKEN_COMMENT_BEGIN: {
+			TokenCommentBegin: {
 				{
 					c(fmt.Sprintf(`(.*?)((?:\+%s|\-%s\s*|%s%s))`, commentEndRe, commentEndRe, commentEndRe, blockSuffixRe)),
-					[]string{TOKEN_COMMENT, TOKEN_COMMENT_END},
+					[]string{TokenComment, TokenCommentEnd},
 					&popCmd,
 				},
 				{c(`(.)`), "" /* TODO */, nil},
 			},
-			TOKEN_BLOCK_BEGIN: append([]rule{
+			TokenBlockBegin: append([]rule{
 				{
 					c(fmt.Sprintf(`(?:\+%s|\-%s\s*|%s%s)`, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
-					TOKEN_BLOCK_END,
+					TokenBlockEnd,
 					&popCmd,
 				},
 			}, tagRules...),
-			TOKEN_VARIABLE_BEGIN: append([]rule{
+			TokenVariableBegin: append([]rule{
 				{
 					c(fmt.Sprintf(`\-%s\s*|%s`, variableEndRe, variableEndRe)),
-					TOKEN_VARIABLE_END,
+					TokenVariableEnd,
 					&popCmd,
 				},
 			}, tagRules...),
-			TOKEN_RAW_BEGIN: append([]rule{
+			TokenRawBegin: append([]rule{
 				{
 					c(fmt.Sprintf(`(.*?)((?:%s(\-|\+|))\s*endraw\s*(?:\+%s|\-%s\s*|%s%s))`, blockStartRe, blockEndRe, blockEndRe, blockEndRe, blockSuffixRe)),
-					OptionalLStrip{data: []string{TOKEN_DATA, TOKEN_RAW_END}},
+					OptionalLStrip{data: []string{TokenData, TokenRawEnd}},
 					&popCmd,
 				},
 			}, tagRules...),
-			TOKEN_LINESTATEMENT_BEGIN: append([]rule{
-				{c(`\s*(\n|$)`), TOKEN_LINECOMMENT_END, &popCmd},
+			TokenLinestatementBegin: append([]rule{
+				{c(`\s*(\n|$)`), TokenLinestatementEnd, &popCmd},
 			}, tagRules...),
-			TOKEN_LINECOMMENT_BEGIN: {
+			TokenLinecommentBegin: {
 				{
 					c(`(.*?)()(?=\n|$)`),
-					[]string{TOKEN_COMMENT, TOKEN_COMMENT_END},
+					[]string{TokenLinecomment, TokenLinecommentEnd},
 					&popCmd,
 				},
 			},
@@ -195,21 +195,21 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 		var value any = raw.valueStr
 		token := raw.token
 		switch raw.token {
-		case TOKEN_LINESTATEMENT_BEGIN:
-			token = TOKEN_BLOCK_BEGIN
-		case TOKEN_LINESTATEMENT_END:
-			token = TOKEN_BLOCK_END
-		case TOKEN_RAW_BEGIN, TOKEN_RAW_END:
+		case TokenLinestatementBegin:
+			token = TokenBlockBegin
+		case TokenLinestatementEnd:
+			token = TokenBlockEnd
+		case TokenRawBegin, TokenRawEnd:
 			continue
-		case TOKEN_DATA:
+		case TokenData:
 			value = l.normalizeNewlines(raw.valueStr)
 		case "keyword":
 			token = raw.valueStr
-		case TOKEN_NAME:
+		case TokenName:
 			if !utils.IsIdentifier(raw.valueStr) {
 				return nil, errors.TemplateSyntaxError("Invalid character in identifier", raw.lineno, name, filename)
 			}
-		case TOKEN_STRING:
+		case TokenString:
 			// TODO improve when we have encoding logic
 			//# try to unescape string
 			//try:
@@ -222,20 +222,20 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 			//	msg = str(e).split(":")[-1].strip()
 			//	raise TemplateSyntaxError(msg, lineno, name, filename) from e
 			value = l.normalizeNewlines(raw.valueStr[1 : len(raw.valueStr)-1])
-		case TOKEN_INTEGER:
+		case TokenInteger:
 			v, err := strconv.ParseInt(strings.Replace(raw.valueStr, "_", "", -1), 0, 64)
 			if err != nil {
 				return nil, err
 			}
 			value = v
-		case TOKEN_FLOAT:
+		case TokenFloat:
 			// TODO change to `ast.literal_eval`
 			v, err := strconv.ParseFloat(strings.Replace(raw.valueStr, "_", "", -1), 64)
 			if err != nil {
 				return nil, err
 			}
 			value = v
-		case TOKEN_OPERATOR:
+		case TokenOperator:
 			token = operators[raw.valueStr]
 		}
 		ret = append(ret, Token{raw.lineno, token, value})
@@ -282,9 +282,9 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 			// is the operator rule. do this only if the end tags look
 			// like operators
 			if balancingStack.Peek() != nil &&
-				(sToks.tokens == TOKEN_VARIABLE_END ||
-					sToks.tokens == TOKEN_BLOCK_END ||
-					sToks.tokens == TOKEN_LINESTATEMENT_END) {
+				(sToks.tokens == TokenVariableEnd ||
+					sToks.tokens == TokenBlockEnd ||
+					sToks.tokens == TokenLinestatementEnd) {
 				continue
 			}
 
@@ -312,7 +312,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 					names := sToks.pattern.SubexpNames()
 					variableExpression := false
 					for i := 0; i < len(names); i++ {
-						if names[i] == TOKEN_VARIABLE_BEGIN && groups[i] != "" {
+						if names[i] == TokenVariableBegin && groups[i] != "" {
 							variableExpression = true
 						}
 					}
@@ -364,7 +364,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 				// strings as token just are yielded as it.
 				data := groups[0]
 				// update brace / parentheses balance
-				if toks == TOKEN_OPERATOR {
+				if toks == TokenOperator {
 					switch data {
 					case "{":
 						balancingStack.Push("}")
