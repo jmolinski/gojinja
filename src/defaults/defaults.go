@@ -13,3 +13,6 @@ const KeepTrailingNewline = false
 
 var LineStatementPrefix *string = nil
 var LineCommentPrefix *string = nil
+
+var DefaultNamespace = map[string]func(...any) any{}
+var DefaultPolicies = map[string]any{}

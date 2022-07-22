@@ -13,6 +13,14 @@ func Keys[K comparable, V any](m map[K]V) []K {
 	return keys
 }
 
+func Copy[K comparable, V any](m map[K]V) map[K]V {
+	res := make(map[K]V)
+	for k, v := range m {
+		res[k] = v
+	}
+	return res
+}
+
 func SortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
 	keys := Keys(m)
 	sort.Slice(keys, func(i int, j int) bool { return keys[i] < keys[j] })
