@@ -30,7 +30,7 @@ func NewTokenStream(tokens []Token, name *string, filename *string) *TokenStream
 func (ts *TokenStream) Next() Token {
 	rv := ts.current
 
-	if ts.current.type_ != TokenEof {
+	if ts.current.Type != TokenEOF {
 		if ts.idx < len(ts.tokens) {
 			ts.current = ts.tokens[ts.idx]
 			ts.idx += 1
@@ -43,16 +43,20 @@ func (ts *TokenStream) Next() Token {
 }
 
 func (ts *TokenStream) Close() {
-	ts.current = Token{ts.current.lineno, TokenEof, ""}
+	ts.current = Token{ts.current.Lineno, TokenEOF, ""}
 	ts.closed = true
 }
 
 func (ts TokenStream) Bool() bool {
-	return ts.current.type_ != TokenEof
+	return ts.current.Type != TokenEOF
 }
 
 func (ts TokenStream) Eos() bool {
 	return !ts.Bool()
+}
+
+func (ts TokenStream) Current() Token {
+	return ts.current
 }
 
 func (ts TokenStream) Look() Token {
@@ -84,17 +88,17 @@ func (ts *TokenStream) Expect(expr string) (*Token, error) {
 	if !ts.current.Test(expr) {
 		desc := DescribeTokenExpr(expr)
 
-		if ts.current.type_ == TokenEof {
+		if ts.current.Type == TokenEOF {
 			return nil, errors.TemplateSyntaxError(
 				fmt.Sprintf("unexpected end of template, expected '%s'.", desc),
-				ts.current.lineno,
+				ts.current.Lineno,
 				ts.name,
 				ts.filename,
 			)
 		}
 		return nil, errors.TemplateSyntaxError(
 			fmt.Sprintf("expected token '%s', got '%s'", desc, DescribeToken(ts.current)),
-			ts.current.lineno,
+			ts.current.Lineno,
 			ts.name,
 			ts.filename,
 		)

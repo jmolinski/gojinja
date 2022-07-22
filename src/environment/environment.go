@@ -3,6 +3,7 @@ package environment
 import (
 	"fmt"
 	"github.com/gojinja/gojinja/src/defaults"
+	"github.com/gojinja/gojinja/src/extensions"
 	"github.com/gojinja/gojinja/src/filters"
 	"github.com/gojinja/gojinja/src/lexer"
 	"github.com/gojinja/gojinja/src/runtime"
@@ -12,6 +13,8 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"strings"
 )
+
+type ExtensionsMap map[string]extensions.IExtension
 
 // Environment is the core component of Jinja.  It contains
 // important shared variables like configuration, filters, tests,
@@ -29,7 +32,7 @@ type Environment struct {
 	TemplateClass Class
 	*lexer.EnvLexerInformation
 	Optimized  bool
-	Extensions map[string]Extension
+	Extensions ExtensionsMap
 	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
 	AutoEscape func(name string) bool
@@ -117,8 +120,8 @@ func configCheck(env *Environment) error {
 	return nil
 }
 
-func LoadExtensions(env *Environment, extensions map[string]func(*Environment) Extension) map[string]Extension {
-	ret := make(map[string]Extension)
+func LoadExtensions(env *Environment, extensions map[string]func(*Environment) extensions.IExtension) ExtensionsMap {
+	ret := make(ExtensionsMap)
 	for k, v := range extensions {
 		ret[k] = v(env)
 	}
@@ -135,12 +138,10 @@ func createCache(cacheSize int) (Cache, error) {
 	return nil, nil
 }
 
-type Extension struct{} // TODO change to real extension
-
 type EnvOpts struct {
 	*lexer.EnvLexerInformation
 	Optimized  bool
-	Extensions map[string]func(*Environment) Extension // TODO jinja accepts also extensions names but it's python import magic I don't know how to do it in golang.
+	Extensions map[string]func(*Environment) extensions.IExtension // TODO jinja accepts also extensions names but it's python import magic I don't know how to do it in golang.
 	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
 	AutoEscape any // bool or func(string)bool

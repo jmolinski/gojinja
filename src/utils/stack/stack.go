@@ -26,3 +26,7 @@ func (stack *Stack[K]) Pop() *K {
 func (stack *Stack[K]) Push(el K) {
 	*stack = append(*stack, el)
 }
+
+func (stack *Stack[K]) Iter() []K {
+	return *stack
+}
