@@ -30,7 +30,7 @@ type Environment struct {
 	*lexer.EnvLexerInformation
 	Optimized  bool
 	Extensions map[string]Extension // extension name or extension
-	Undefined  runtime.UndefinedClass
+	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
 	AutoEscape any // bool or func(string)bool
 	Loader     *Loader
@@ -126,7 +126,7 @@ type EnvOpts struct {
 	*lexer.EnvLexerInformation
 	Optimized  bool
 	Extensions map[string]func(*Environment) Extension // TODO jinja accepts also extensions names but it's python import magic I don't know how to do it in golang.
-	Undefined  runtime.UndefinedClass
+	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
 	AutoEscape any // bool or func(string)bool
 	Loader     *Loader
@@ -134,17 +134,21 @@ type EnvOpts struct {
 	AutoReload bool
 }
 
+type UndefinedConstructor func(hint *string, obj any, name *string, exc func(msg string) error) runtime.IUndefined
+
 func DefaultEnvOpts() *EnvOpts {
 	return &EnvOpts{
 		Optimized:           true,
 		Extensions:          nil,
 		EnvLexerInformation: lexer.DefaultEnvLexerInformation(),
-		Undefined:           runtime.UndefinedClass{},
-		Finalize:            nil,
-		AutoEscape:          false,
-		Loader:              nil,
-		CacheSize:           400,
-		AutoReload:          true,
+		Undefined: func(hint *string, obj any, name *string, exc func(msg string) error) runtime.IUndefined {
+			return runtime.NewUndefined(hint, obj, name, exc)
+		},
+		Finalize:   nil,
+		AutoEscape: false,
+		Loader:     nil,
+		CacheSize:  400,
+		AutoReload: true,
 	}
 }
 
