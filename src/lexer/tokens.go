@@ -170,11 +170,11 @@ func describeTokenType(tokenType string) string {
 }
 
 func DescribeToken(token Token) string {
-	if token.type_ == TokenName {
-		return fmt.Sprint(token.value)
+	if token.Type == TokenName {
+		return fmt.Sprint(token.Value)
 	}
 
-	return describeTokenType(token.type_)
+	return describeTokenType(token.Type)
 }
 
 func DescribeTokenExpr(expr string) string {
@@ -189,9 +189,9 @@ func DescribeTokenExpr(expr string) string {
 }
 
 type Token struct {
-	lineno int
-	type_  string
-	value  any
+	Lineno int
+	Type   string
+	Value  any
 }
 
 func (t Token) String() string {
@@ -199,12 +199,12 @@ func (t Token) String() string {
 }
 
 func (t Token) Test(expr string) bool {
-	if t.type_ == expr {
+	if t.Type == expr {
 		return true
 	}
 	if strings.Contains(expr, ":") {
 		res := strings.SplitN(expr, ":", 1)
-		return res[0] == t.type_ && res[1] == t.value
+		return res[0] == t.Type && res[1] == t.Value
 	}
 	return false
 }
