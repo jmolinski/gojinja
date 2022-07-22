@@ -39,7 +39,7 @@ type Environment struct {
 	AutoReload bool
 	Filters    map[string]filters.Filter
 	Tests      map[string]tests.Test
-	Globals    map[string]func(...any) any
+	Globals    map[string]any
 	Policies   map[string]any
 }
 
@@ -147,4 +147,63 @@ func DefaultEnvOpts() *EnvOpts {
 		CacheSize:           400,
 		AutoReload:          true,
 	}
+}
+
+// GetTemplate loads a template by name with `Loader` and returns a `Template`.
+// If the template does not exist a `TemplateNotFound` exception is raised.
+func (env *Environment) GetTemplate(name any, parent *string, globals map[string]any) (ITemplate, error) {
+	switch v := name.(type) {
+	case ITemplate:
+		return v, nil
+	case string:
+		if parent != nil {
+			v = env.JoinPath(v, *parent)
+		}
+		return env.loadTemplate(v, globals)
+	default:
+		return nil, fmt.Errorf("unexpected type for `name`")
+	}
+}
+
+// JoinPath joins a template with the parent. By default, all the lookups are
+// relative to the loader root so this method returns the `template`
+// parameter unchanged, but if the paths should be relative to the
+// parent template, this function can be used to calculate the real
+// template name.
+//
+// Subclasses may override this method and implement template path
+// joining here.
+func (env *Environment) JoinPath(v string, parent string) string {
+	// TODO in jinja it may be overwritten by subclass
+	return v
+}
+
+func (env *Environment) loadTemplate(name string, globals map[string]any) (ITemplate, error) {
+	if env.Loader == nil {
+		return nil, fmt.Errorf("no loader for this environment specified")
+	}
+	cacheKey := fmt.Sprint(env.Loader, name)
+
+	if env.Cache != nil {
+		template, ok := env.Cache.Get(cacheKey)
+		if ok {
+			tmpl := template.(ITemplate)
+			if !env.AutoReload && tmpl.IsUpToDate() {
+				maps.Update(tmpl.Globals(), globals)
+			}
+			return tmpl, nil
+		}
+	}
+	template, err := (*env.Loader).Load(env, name, env.MakeGlobals(globals))
+	if err != nil {
+		return nil, err
+	}
+	if env.Cache != nil {
+		env.Cache.Add(cacheKey, template)
+	}
+	return template, nil
+}
+
+func (env *Environment) MakeGlobals(globals map[string]any) map[string]any {
+	return maps.Chain(globals, env.Globals)
 }

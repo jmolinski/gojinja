@@ -30,11 +30,11 @@ type Loader struct {
 
 type LoaderEmbed interface {
 	HasSourceAccess() bool
-	GetSource(env environment.Environment, template string) (string, *string, environment.UpToDate, error)
+	GetSource(env *environment.Environment, template string) (string, *string, environment.UpToDate, error)
 	ListTemplates() ([]string, error)
 }
 
-func (l *Loader) Load(env environment.Environment, name string, globals map[string]any) (environment.ITemplate, error) {
+func (l *Loader) Load(env *environment.Environment, name string, globals map[string]any) (environment.ITemplate, error) {
 	source, filename, upToDate, err := l.GetSource(env, name)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (f fsLoader) HasSourceAccess() bool {
 	return true
 }
 
-func (f fsLoader) GetSource(_ environment.Environment, template string) (string, *string, environment.UpToDate, error) {
+func (f fsLoader) GetSource(_ *environment.Environment, template string) (string, *string, environment.UpToDate, error) {
 	pieces, err := splitTemplatePath(template)
 	if err != nil {
 		return "", nil, nil, err
