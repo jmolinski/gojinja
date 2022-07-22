@@ -31,46 +31,12 @@ var compareOperators = set.FrozenFromElems(
 	"eq", "ne", "lt", "lteq", "gt", "gteq",
 )
 
-func makeMathNode(left, right nodes.Node, op string, lineno int) nodes.Node {
-	switch op {
-	case "add":
-		return &nodes.Add{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	case "sub":
-		return &nodes.Sub{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	case "mul":
-		return &nodes.Mul{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	case "div":
-		return &nodes.Div{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	case "floordiv":
-		return &nodes.FloorDiv{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	case "mod":
-		return &nodes.Mod{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	default:
-		panic("unknown operator")
+func makeBinaryMathNode(left, right nodes.Node, op string, lineno int) nodes.Node {
+	return &nodes.BinOp{
+		Left:       left,
+		Right:      right,
+		Op:         op,
+		NodeCommon: nodes.NodeCommon{Lineno: lineno},
 	}
 }
 
@@ -475,13 +441,14 @@ func (p *parser) parseMath1() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeMathNode(left, right, currentType, lineno)
+		left = makeBinaryMathNode(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 }
 
 func (p *parser) parseMath2() (nodes.Node, error) {
+	// TODO it's almost identical as parseMath1
 	lineno := p.stream.Current().Lineno
 	left, err := p.parsePow()
 	if err != nil {
@@ -495,7 +462,7 @@ func (p *parser) parseMath2() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeMathNode(left, right, currentType, lineno)
+		left = makeBinaryMathNode(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
@@ -540,11 +507,7 @@ func (p *parser) parsePow() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &nodes.Pow{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
+		left = makeBinaryMathNode(left, right, lexer.TokenPow, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil

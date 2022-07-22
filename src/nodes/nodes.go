@@ -89,45 +89,10 @@ type Compare struct {
 	NodeCommon
 }
 
-type Add struct {
+type BinOp struct {
 	Left  Node
 	Right Node
-	NodeCommon
-}
-
-type Sub struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type Mul struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type Div struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type FloorDiv struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type Mod struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type Pow struct {
-	Left  Node
-	Right Node
+	Op    string // same as lexer.TokenAdd etc.
 	NodeCommon
 }
 
