@@ -1,0 +1,277 @@
+package environment
+
+import (
+	"fmt"
+	"github.com/gojinja/gojinja/src/runtime"
+	"github.com/gojinja/gojinja/src/utils/slices"
+	"reflect"
+	"strings"
+)
+
+func getInt(idx int, values ...any) (int64, error) {
+	if len(values) <= idx {
+		return 0, fmt.Errorf("not enough values passed to the test")
+	}
+	res, ok := toInt(values[idx])
+	if !ok {
+		return 0, fmt.Errorf("value passed to the test is not an integer")
+	}
+	return res, nil
+}
+
+func toInt(v any) (i int64, ok bool) {
+	if p, ok := v.(int); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(int8); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(int16); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(int32); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(uint); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(uint8); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(uint16); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(uint32); ok {
+		return int64(p), ok
+	}
+	if p, ok := v.(uint64); ok {
+		return int64(p), ok
+	}
+	i, ok = v.(int64)
+	return
+}
+
+func toString(v any) string {
+	return fmt.Sprint(v)
+}
+
+func toFloat(v any) (f float64, ok bool) {
+	if p, ok := v.(float32); ok {
+		return float64(p), ok
+	}
+	f, ok = v.(float64)
+	return
+}
+
+func toComplex(v any) (c complex128, ok bool) {
+	if p, ok := v.(complex64); ok {
+		return complex128(p), ok
+	}
+	c, ok = v.(complex128)
+	return
+}
+
+func testOdd(_ *Environment, f any, _ ...any) (bool, error) {
+	value, ok := toInt(f)
+	if !ok {
+		return false, fmt.Errorf("value passed to the test is not an integer")
+	}
+	return value%2 == 1, nil
+}
+
+func testEven(_ *Environment, f any, _ ...any) (bool, error) {
+	value, ok := toInt(f)
+	if !ok {
+		return false, fmt.Errorf("value passed to the test is not an integer")
+	}
+	return value%2 == 0, nil
+}
+
+func testDivisibleBy(_ *Environment, f any, values ...any) (bool, error) {
+	value, ok := toInt(f)
+	if !ok {
+		return false, fmt.Errorf("value passed to the test is not an integer")
+	}
+	num, err := getInt(0, values)
+	if err != nil {
+		return false, err
+	}
+	if num == 0 {
+		return false, fmt.Errorf("tried to divide by zero")
+	}
+	return value%num == 0, nil
+}
+
+func testUndefined(_ *Environment, value any, _ ...any) (bool, error) {
+	_, ok := value.(runtime.Undefined)
+	return ok, nil
+}
+
+func testDefined(e *Environment, value any, values ...any) (bool, error) {
+	un, err := testUndefined(e, value, values...)
+	return !un, err
+}
+
+func testFilter(env *Environment, value any, _ ...any) (bool, error) {
+	v, ok := value.(string)
+	if !ok {
+		return false, fmt.Errorf("argument is not a string")
+	}
+	_, in := env.Filters[v]
+	return in, nil
+}
+
+func testTest(env *Environment, value any, _ ...any) (bool, error) {
+	v, ok := value.(string)
+	if !ok {
+		return false, fmt.Errorf("argument is not a string")
+	}
+	_, in := env.Tests[v]
+	return in, nil
+}
+
+func testNone(_ *Environment, value any, _ ...any) (bool, error) {
+	return value == nil, nil
+}
+
+func testBoolean(_ *Environment, value any, _ ...any) (bool, error) {
+	_, isBool := value.(bool)
+	return isBool, nil
+}
+
+func testFalse(_ *Environment, value any, _ ...any) (bool, error) {
+	return value == false, nil
+}
+
+func testTrue(_ *Environment, value any, _ ...any) (bool, error) {
+	return value == true, nil
+}
+
+func testInteger(_ *Environment, value any, _ ...any) (bool, error) {
+	_, ok := toInt(value)
+	return ok, nil
+}
+
+func testFloat(_ *Environment, value any, _ ...any) (bool, error) {
+	_, ok := toFloat(value)
+	return ok, nil
+}
+
+func testLower(_ *Environment, value any, _ ...any) (bool, error) {
+	s := toString(value)
+	return strings.ToLower(s) == s, nil
+}
+
+func testUpper(_ *Environment, value any, _ ...any) (bool, error) {
+	s := toString(value)
+	return strings.ToUpper(s) == s, nil
+}
+
+func testString(_ *Environment, value any, _ ...any) (bool, error) {
+	_, ok := value.(string)
+	return ok, nil
+}
+
+func testMapping(_ *Environment, value any, _ ...any) (bool, error) {
+	return reflect.TypeOf(value).Kind() == reflect.Map, nil
+}
+
+func testNumber(_ *Environment, value any, _ ...any) (bool, error) {
+	_, isInt := toInt(value)
+	_, isFloat := toFloat(value)
+	_, isComplex := toComplex(value)
+
+	return isInt || isFloat || isComplex, nil
+}
+
+func testSequence(_ *Environment, value any, _ ...any) (bool, error) {
+	return reflect.TypeOf(value).Kind() == reflect.Slice, nil
+}
+
+func testCallable(_ *Environment, value any, _ ...any) (bool, error) {
+	return reflect.TypeOf(value).Kind() == reflect.Func, nil
+}
+
+func testSameAs(_ *Environment, value any, values ...any) (bool, error) {
+	// It is not exactly the same as in jinja as it's impossible to be as jinja uses `is`.
+	if len(values) == 0 {
+		return false, fmt.Errorf("not enough values passed to the function")
+	}
+	v2 := values[0]
+	switch reflect.TypeOf(values).Kind() {
+	case reflect.Bool:
+		return value == v2, nil
+	case reflect.Chan, reflect.Map, reflect.Func, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+		if slices.Contains([]reflect.Kind{reflect.Chan, reflect.Map, reflect.Func, reflect.Pointer, reflect.Slice, reflect.UnsafePointer}, reflect.TypeOf(v2).Kind()) {
+			return reflect.ValueOf(value).Pointer() == reflect.ValueOf(v2).Pointer(), nil
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
+}
+
+func testIterable(_ *Environment, value any, _ ...any) (bool, error) {
+	return slices.Contains([]reflect.Kind{reflect.Slice, reflect.Map, reflect.Chan}, reflect.TypeOf(value).Kind()), nil
+}
+
+type Escaped interface {
+	HTML()
+}
+
+func testEscaped(_ *Environment, value any, _ ...any) (bool, error) {
+	_, ok := value.(Escaped)
+	return ok, nil
+}
+
+func testIn(_ *Environment, value any, values ...any) (bool, error) {
+	if len(values) == 0 {
+		return false, fmt.Errorf("not enough values passed to the function")
+	}
+
+	switch reflect.TypeOf(values[0]).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(values[0])
+		for i := 0; i < s.Len(); i++ {
+			if value == s.Index(i).Interface() {
+				return true, nil
+			}
+		}
+		return false, nil
+	case reflect.Map:
+		s := reflect.ValueOf(values[0])
+		v := s.MapIndex(reflect.ValueOf(value))
+		return v != reflect.Value{}, nil
+	default:
+		return false, fmt.Errorf("second arguemnt is not a slice")
+	}
+}
+
+// Test represents a test function. Some tests only require one variable
+type Test func(env *Environment, firstArg any, args ...any) (bool, error)
+
+var Default = map[string]Test{
+	"odd":         testOdd,
+	"even":        testEven,
+	"divisibleby": testDivisibleBy,
+	"defined":     testDefined,
+	"undefined":   testUndefined,
+	"filter":      testFilter,
+	"test":        testTest,
+	"none":        testNone,
+	"boolean":     testBoolean,
+	"false":       testFalse,
+	"true":        testTrue,
+	"integer":     testInteger,
+	"float":       testFloat,
+	"lower":       testLower,
+	"upper":       testUpper,
+	"string":      testString,
+	"mapping":     testMapping,
+	"number":      testNumber,
+	"sequence":    testSequence,
+	"iterable":    testIterable,
+	"in":          testIn,
+	"callable":    testCallable,
+	// TODO operators
+}

@@ -7,7 +7,6 @@ import (
 	"github.com/gojinja/gojinja/src/filters"
 	"github.com/gojinja/gojinja/src/lexer"
 	"github.com/gojinja/gojinja/src/runtime"
-	"github.com/gojinja/gojinja/src/tests"
 	"github.com/gojinja/gojinja/src/utils/maps"
 	"github.com/gojinja/gojinja/src/utils/slices"
 	lru "github.com/hashicorp/golang-lru"
@@ -41,7 +40,7 @@ type Environment struct {
 	Cache      Cache
 	AutoReload bool
 	Filters    map[string]filters.Filter
-	Tests      map[string]tests.Test
+	Tests      map[string]Test
 	Globals    map[string]any
 	Policies   map[string]any
 }
@@ -79,7 +78,7 @@ func New(opts *EnvOpts) (*Environment, error) {
 		Loader:              opts.Loader,
 		AutoReload:          opts.AutoReload,
 		Filters:             maps.Copy(filters.Default),
-		Tests:               maps.Copy(tests.Default),
+		Tests:               maps.Copy(Default),
 		Globals:             maps.Copy(defaults.DefaultNamespace),
 		Policies:            maps.Copy(defaults.DefaultPolicies),
 	}
