@@ -76,7 +76,7 @@ var cases = []parserTest{
 				},
 				&nodes.Output{
 					Nodes: []nodes.Node{
-						&nodes.Add{
+						&nodes.BinOp{
 							Left: &nodes.Const{
 								Value:      int64(5),
 								NodeCommon: nodes.NodeCommon{Lineno: 1},
@@ -85,6 +85,7 @@ var cases = []parserTest{
 								Value:      int64(1),
 								NodeCommon: nodes.NodeCommon{Lineno: 1},
 							},
+							Op:         lexer.TokenAdd,
 							NodeCommon: nodes.NodeCommon{Lineno: 1},
 						},
 					},
