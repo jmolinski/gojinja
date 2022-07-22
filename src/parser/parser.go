@@ -560,15 +560,9 @@ func (p *parser) parseUnary(withFilter bool) (node nodes.Node, err error) {
 		if err != nil {
 			return
 		}
-	}
-	if tokenType == lexer.TokenSub {
-		node = &nodes.Neg{
+		node = &nodes.UnaryOp{
 			Node:       node,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
-	} else if tokenType == lexer.TokenAdd {
-		node = &nodes.Pos{
-			Node:       node,
+			Op:         tokenType,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
 	} else {

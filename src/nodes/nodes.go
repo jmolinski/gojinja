@@ -136,13 +136,9 @@ type Concat struct {
 	NodeCommon
 }
 
-type Neg struct {
+type UnaryOp struct {
 	Node Node
-	NodeCommon
-}
-
-type Pos struct {
-	Node Node
+	Op   string // same as lexer.TokenAdd etc.
 	NodeCommon
 }
 
