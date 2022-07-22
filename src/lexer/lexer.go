@@ -6,7 +6,6 @@ import (
 	"github.com/gojinja/gojinja/src/utils"
 	"github.com/gojinja/gojinja/src/utils/stack"
 	"github.com/hashicorp/golang-lru"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -66,6 +65,11 @@ type rule struct {
 	command *string
 }
 
+// Lexer is a struct that implements a lexer for a given environment. Automatically
+// created by the environment class, usually you don't have to do that.
+//
+// Note that the lexer is not automatically bound to an environment.
+// Multiple environments can share the same lexer.
 type Lexer struct {
 	lStripBlocks        bool
 	newlineSequence     string
@@ -164,6 +168,7 @@ func (l Lexer) normalizeNewlines(value string) string {
 	return newlineRe.ReplaceAllString(value, l.newlineSequence)
 }
 
+// Tokenize calls Tokeniter and wraps it using Wrap into a token stream.
 func (l *Lexer) Tokenize(source string, name *string, filename *string, state *string) (*TokenStream, error) {
 	stream, err := l.Tokeniter(source, name, filename, state)
 	if err != nil {
@@ -182,8 +187,11 @@ type tokenRaw struct {
 	valueStr string
 }
 
+// OptionalLStrip is used for marking a point in the state that can have lstrip applied.
 type OptionalLStrip struct{ data []string }
 
+// Wrap is called with the stream as returned by `tokenize` and wraps
+// every token in a `Token` and converts the value.
 func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token, error) {
 	ret := make([]Token, 0, len(stream))
 	for _, raw := range stream {
@@ -242,6 +250,8 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 	return ret, nil
 }
 
+// Tokeniter tokenizes the text and returns the tokens.
+// Use this method if you just want to tokenize a template.
 func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *string) (ret []tokenRaw, err error) {
 	lines := newlineRe.Split(source, -1)
 	if !l.keepTrailingNewline && lines[len(lines)-1] == "" {
@@ -256,8 +266,7 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 
 	if state != nil && *state != "root" {
 		if *state != "variable" && *state != "block" {
-			_, _ = fmt.Fprintf(os.Stderr, "invalid state")
-			os.Exit(1)
+			return nil, fmt.Errorf("invalid state")
 		}
 		st.Push(*state + "_begin")
 	}
@@ -446,13 +455,14 @@ func (l *Lexer) Tokeniter(source string, name *string, filename *string, state *
 	return nil, errors.TemplateSyntaxError(fmt.Sprintf("unexpected char '%s' at %d", string(source[pos]), pos), lineno, name, filename)
 }
 
+// Failure is used by the `Lexer` to specify known errors.
 type Failure struct {
 	msg string
 }
 
 func (f Failure) Error(lineno int, filename *string) error {
 	// I do not undestand why filename is passed as name and not filename but that what jinja does.
-	return errors.TemplateSyntaxError(f.msg, lineno, filename, nil)
+	return errors.TemplateSyntaxError(f.msg, lineno, filename, filename)
 }
 
 func toToks(tokens any) ([]string, bool) {
