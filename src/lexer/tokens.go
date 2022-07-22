@@ -20,9 +20,9 @@ const TokenEq = "eq"
 const TokenFloordiv = "floordiv"
 const TokenGt = "gt"
 const TokenGteq = "gteq"
-const TokenLbrace = "lbrace"
-const TokenLbracket = "lbracket"
-const TokenLparen = "lparen"
+const TokenLBrace = "lbrace"
+const TokenLBracket = "lbracket"
+const TokenLParen = "lparen"
 const TokenLt = "lt"
 const TokenLteq = "lteq"
 const TokenMod = "mod"
@@ -30,9 +30,9 @@ const TokenMul = "mul"
 const TokenNe = "ne"
 const TokenPipe = "pipe"
 const TokenPow = "pow"
-const TokenRbrace = "rbrace"
-const TokenRbracket = "rbracket"
-const TokenRparen = "rparen"
+const TokenRBrace = "rbrace"
+const TokenRBracket = "rbracket"
+const TokenRParen = "rparen"
 const TokenSemicolon = "semicolon"
 const TokenSub = "sub"
 const TokenTilde = "tilde"
@@ -58,7 +58,7 @@ const TokenLinecommentEnd = "linecomment_end"
 const TokenLinecomment = "linecomment"
 const TokenData = "data"
 const TokenInitial = "initial"
-const TokenEof = "eof"
+const TokenEOF = "eof"
 
 var operators = map[string]string{
 	"+":  TokenAdd,
@@ -69,12 +69,12 @@ var operators = map[string]string{
 	"%":  TokenMod,
 	"**": TokenPow,
 	"~":  TokenTilde,
-	"[":  TokenLbracket,
-	"]":  TokenRbracket,
-	"(":  TokenLparen,
-	")":  TokenRparen,
-	"{":  TokenLbrace,
-	"}":  TokenRbrace,
+	"[":  TokenLBracket,
+	"]":  TokenRBracket,
+	"(":  TokenLParen,
+	")":  TokenRParen,
+	"{":  TokenLBrace,
+	"}":  TokenRBrace,
 	"==": TokenEq,
 	"!=": TokenNe,
 	">":  TokenGt,
@@ -162,7 +162,7 @@ func describeTokenType(tokenType string) string {
 		return "end of line statement"
 	case TokenData:
 		return "template data / text"
-	case TokenEof:
+	case TokenEOF:
 		return "end of template"
 	default:
 		return tokenType
@@ -203,7 +203,7 @@ func (t Token) Test(expr string) bool {
 		return true
 	}
 	if strings.Contains(expr, ":") {
-		res := strings.SplitN(expr, ":", 1)
+		res := strings.SplitN(expr, ":", 2)
 		return res[0] == t.Type && res[1] == t.Value
 	}
 	return false

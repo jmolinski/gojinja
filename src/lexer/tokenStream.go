@@ -30,7 +30,7 @@ func NewTokenStream(tokens []Token, name *string, filename *string) *TokenStream
 func (ts *TokenStream) Next() Token {
 	rv := ts.current
 
-	if ts.current.Type != TokenEof {
+	if ts.current.Type != TokenEOF {
 		if ts.idx < len(ts.tokens) {
 			ts.current = ts.tokens[ts.idx]
 			ts.idx += 1
@@ -43,12 +43,12 @@ func (ts *TokenStream) Next() Token {
 }
 
 func (ts *TokenStream) Close() {
-	ts.current = Token{ts.current.Lineno, TokenEof, ""}
+	ts.current = Token{ts.current.Lineno, TokenEOF, ""}
 	ts.closed = true
 }
 
 func (ts TokenStream) Bool() bool {
-	return ts.current.Type != TokenEof
+	return ts.current.Type != TokenEOF
 }
 
 func (ts TokenStream) Eos() bool {
@@ -88,7 +88,7 @@ func (ts *TokenStream) Expect(expr string) (*Token, error) {
 	if !ts.current.Test(expr) {
 		desc := DescribeTokenExpr(expr)
 
-		if ts.current.Type == TokenEof {
+		if ts.current.Type == TokenEOF {
 			return nil, errors.TemplateSyntaxError(
 				fmt.Sprintf("unexpected end of template, expected '%s'.", desc),
 				ts.current.Lineno,
