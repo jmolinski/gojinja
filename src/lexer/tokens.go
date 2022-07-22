@@ -114,7 +114,7 @@ func getOperatorRe(ops map[string]string) *regexp.Regexp {
 		els[i] = regexp.QuoteMeta(el)
 	}
 	pat := strings.Join(els, "|")
-	return regexp.MustCompile(pat)
+	return regexp.MustCompile("^" + pat)
 }
 
 var ignoredTokens = set.FrozenFromElems(
