@@ -26,6 +26,25 @@ var integerRe = regexp.MustCompile(`(?i)^(0b(_?[0-1])+|0o(_?[0-7])+|0x(_?[\da-f]
 //)
 var floatRe = regexp.MustCompile(`(?i)^(\d+_)*\d+((\.(\d+_)*\d+)?e[+\-]?(\d+_)*\d+|\.(\d+_)*\d+)`)
 
+func CountNewlines(value string) int {
+	// Count "\r\n", "\r" and "\n" as a single newline.
+
+	var count int
+
+	idx, stringLen := 0, len(value)
+	for idx < stringLen {
+		if value[idx] == '\r' || value[idx] == '\n' {
+			count++
+		}
+		if value[idx] == '\r' && idx+1 < stringLen && value[idx+1] == '\n' {
+			idx++
+		}
+		idx++
+	}
+
+	return count
+}
+
 type rulePair struct {
 	name    string
 	pattern string

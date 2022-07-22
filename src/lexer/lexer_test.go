@@ -75,3 +75,15 @@ func runCase(c testLexer, t *testing.T) {
 		t.Fatal("not all tokens have been produced")
 	}
 }
+
+func TestCountNewlines(t *testing.T) {
+	if CountNewlines("\nb\n\naaaaaa") != 3 {
+		t.Fatal("expected 3 newlines")
+	}
+	if CountNewlines("\rb\r\raaaaaa") != 3 {
+		t.Fatal("expected 3 newlines")
+	}
+	if CountNewlines("\r\nb\n\r\r\n\r\n\naaaaaa") != 6 {
+		t.Fatal("expected 6 newlines")
+	}
+}
