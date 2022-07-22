@@ -107,9 +107,7 @@ func (f fsLoader) ListTemplates() ([]string, error) {
 			template := p[len(searchPath):]
 			template = strings.Trim(template, string(os.PathSeparator))
 			template = strings.Replace(template, string(os.PathSeparator), "/", -1)
-			if strings.HasPrefix(template, "./") {
-				template = template[2:]
-			}
+			template = strings.TrimPrefix(template, "./")
 			found[template] = struct{}{}
 			return nil
 		}
