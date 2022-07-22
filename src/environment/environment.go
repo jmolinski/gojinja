@@ -32,7 +32,7 @@ type Environment struct {
 	Extensions map[string]Extension // extension name or extension
 	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
-	AutoEscape any // bool or func(string)bool
+	AutoEscape func(name string) bool
 	Loader     *Loader
 	Cache      Cache
 	AutoReload bool
@@ -72,7 +72,6 @@ func New(opts *EnvOpts) (*Environment, error) {
 		Optimized:           opts.Optimized,
 		Undefined:           opts.Undefined,
 		Finalize:            opts.Finalize,
-		AutoEscape:          opts.AutoEscape,
 		Loader:              opts.Loader,
 		AutoReload:          opts.AutoReload,
 		Filters:             maps.Copy(filters.Default),
@@ -80,6 +79,8 @@ func New(opts *EnvOpts) (*Environment, error) {
 		Globals:             maps.Copy(defaults.DefaultNamespace),
 		Policies:            maps.Copy(defaults.DefaultPolicies),
 	}
+	env.AutoEscape, err = convertAutoEscape(opts.AutoEscape)
+
 	env.Cache, err = createCache(opts.CacheSize)
 	if err != nil {
 		return nil, err
@@ -90,6 +91,17 @@ func New(opts *EnvOpts) (*Environment, error) {
 		return nil, err
 	}
 	return env, nil
+}
+
+func convertAutoEscape(ae any) (func(name string) bool, error) {
+	switch v := ae.(type) {
+	case bool:
+		return func(string) bool { return v }, nil
+	case func(string) bool:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("unexpected type of AutoEscape")
+	}
 }
 
 func configCheck(env *Environment) error {
