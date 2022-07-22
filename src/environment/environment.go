@@ -29,7 +29,7 @@ type Environment struct {
 	TemplateClass Class
 	*lexer.EnvLexerInformation
 	Optimized  bool
-	Extensions map[string]Extension // extension name or extension
+	Extensions map[string]Extension
 	Undefined  UndefinedConstructor
 	Finalize   func(...any) any
 	AutoEscape func(name string) bool
