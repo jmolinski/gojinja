@@ -5,7 +5,6 @@ import (
 	"github.com/gojinja/gojinja/src/defaults"
 	"github.com/gojinja/gojinja/src/filters"
 	"github.com/gojinja/gojinja/src/lexer"
-	"github.com/gojinja/gojinja/src/loaders"
 	"github.com/gojinja/gojinja/src/runtime"
 	"github.com/gojinja/gojinja/src/tests"
 	"github.com/gojinja/gojinja/src/utils/maps"
@@ -34,7 +33,7 @@ type Environment struct {
 	Undefined  runtime.UndefinedClass
 	Finalize   func(...any) any
 	AutoEscape any // bool or func(string)bool
-	Loader     *loaders.Loader
+	Loader     *Loader
 	Cache      Cache
 	AutoReload bool
 	Filters    map[string]filters.Filter
@@ -130,7 +129,7 @@ type EnvOpts struct {
 	Undefined  runtime.UndefinedClass
 	Finalize   func(...any) any
 	AutoEscape any // bool or func(string)bool
-	Loader     *loaders.Loader
+	Loader     *Loader
 	CacheSize  int
 	AutoReload bool
 }
