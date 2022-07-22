@@ -28,7 +28,7 @@ func DefaultEnvLexerInformation() *EnvLexerInformation {
 		LineStatementPrefix: defaults.LineStatementPrefix,
 		LineCommentPrefix:   defaults.LineCommentPrefix,
 		TrimBlocks:          defaults.TrimBlocks,
-		LStripBlocks:        defaults.LstripBlocks,
+		LStripBlocks:        defaults.LStripBlocks,
 		NewlineSequence:     defaults.NewlineSequence,
 		KeepTrailingNewline: defaults.KeepTrailingNewline,
 	}

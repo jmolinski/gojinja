@@ -1,8 +1,7 @@
-package loaders
+package environment
 
 import (
 	"github.com/gojinja/gojinja/src/encoding"
-	"github.com/gojinja/gojinja/src/environment"
 	"github.com/gojinja/gojinja/src/errors"
 	"github.com/gojinja/gojinja/src/utils"
 	"github.com/gojinja/gojinja/src/utils/maps"
@@ -30,11 +29,11 @@ type Loader struct {
 
 type LoaderEmbed interface {
 	HasSourceAccess() bool
-	GetSource(env environment.Environment, template string) (string, *string, environment.UpToDate, error)
+	GetSource(env *Environment, template string) (string, *string, UpToDate, error)
 	ListTemplates() ([]string, error)
 }
 
-func (l *Loader) Load(env environment.Environment, name string, globals map[string]any) (environment.ITemplate, error) {
+func (l *Loader) Load(env *Environment, name string, globals map[string]any) (ITemplate, error) {
 	source, filename, upToDate, err := l.GetSource(env, name)
 	if err != nil {
 		return nil, err
@@ -52,7 +51,7 @@ func (f fsLoader) HasSourceAccess() bool {
 	return true
 }
 
-func (f fsLoader) GetSource(_ environment.Environment, template string) (string, *string, environment.UpToDate, error) {
+func (f fsLoader) GetSource(_ *Environment, template string) (string, *string, UpToDate, error) {
 	pieces, err := splitTemplatePath(template)
 	if err != nil {
 		return "", nil, nil, err
