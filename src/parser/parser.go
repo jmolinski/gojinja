@@ -31,7 +31,7 @@ var compareOperators = set.FrozenFromElems(
 	"eq", "ne", "lt", "lteq", "gt", "gteq",
 )
 
-func makeBinaryMathNode(left, right nodes.Node, op string, lineno int) nodes.Node {
+func makeBinaryOpNode(left, right nodes.Node, op string, lineno int) nodes.Node {
 	return &nodes.BinOp{
 		Left:       left,
 		Right:      right,
@@ -328,11 +328,7 @@ func (p *parser) parseOr() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &nodes.Or{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
+		left = makeBinaryOpNode(left, right, "or", lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
@@ -349,11 +345,7 @@ func (p *parser) parseAnd() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = &nodes.And{
-			Left:       left,
-			Right:      right,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
-		}
+		left = makeBinaryOpNode(left, right, "and", lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
@@ -366,8 +358,9 @@ func (p *parser) parseNot() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &nodes.Not{
+		return &nodes.UnaryOp{
 			Node:       n,
+			Op:         "not",
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}, nil
 	}
@@ -441,7 +434,7 @@ func (p *parser) parseMath1() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryMathNode(left, right, currentType, lineno)
+		left = makeBinaryOpNode(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
@@ -462,7 +455,7 @@ func (p *parser) parseMath2() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryMathNode(left, right, currentType, lineno)
+		left = makeBinaryOpNode(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
@@ -507,7 +500,7 @@ func (p *parser) parsePow() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryMathNode(left, right, lexer.TokenPow, lineno)
+		left = makeBinaryOpNode(left, right, lexer.TokenPow, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil

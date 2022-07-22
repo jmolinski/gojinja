@@ -60,23 +60,6 @@ type CondExpr struct {
 	NodeCommon
 }
 
-type Or struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type And struct {
-	Left  Node
-	Right Node
-	NodeCommon
-}
-
-type Not struct {
-	Node Node
-	NodeCommon
-}
-
 type Operand struct {
 	Op   string
 	Expr Node
@@ -92,7 +75,7 @@ type Compare struct {
 type BinOp struct {
 	Left  Node
 	Right Node
-	Op    string // same as lexer.TokenAdd etc.
+	Op    string // same as lexer.TokenAdd etc. + "and", "or"
 	NodeCommon
 }
 
@@ -103,7 +86,7 @@ type Concat struct {
 
 type UnaryOp struct {
 	Node Node
-	Op   string // same as lexer.TokenAdd etc.
+	Op   string // same as lexer.TokenAdd etc. + "not"
 	NodeCommon
 }
 
