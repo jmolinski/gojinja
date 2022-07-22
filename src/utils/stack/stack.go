@@ -27,10 +27,6 @@ func (stack *Stack[K]) Push(el K) {
 	*stack = append(*stack, el)
 }
 
-func (stack *Stack[K]) AsSlice() []K {
+func (stack *Stack[K]) Iter() []K {
 	return *stack
-}
-
-func (stack *Stack[K]) Len() int {
-	return len(*stack)
 }

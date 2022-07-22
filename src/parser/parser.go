@@ -7,6 +7,7 @@ import (
 	"github.com/gojinja/gojinja/src/lexer"
 	"github.com/gojinja/gojinja/src/nodes"
 	"github.com/gojinja/gojinja/src/utils/set"
+	"github.com/gojinja/gojinja/src/utils/slices"
 	"github.com/gojinja/gojinja/src/utils/stack"
 	"strings"
 )
@@ -31,43 +32,44 @@ var compareOperators = set.FrozenFromElems(
 )
 
 func makeMathNode(left, right nodes.Node, op string, lineno int) nodes.Node {
-	if op == "add" {
+	switch op {
+	case "add":
 		return &nodes.Add{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else if op == "sub" {
+	case "sub":
 		return &nodes.Sub{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else if op == "mul" {
+	case "mul":
 		return &nodes.Mul{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else if op == "div" {
+	case "div":
 		return &nodes.Div{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else if op == "floordiv" {
+	case "floordiv":
 		return &nodes.FloorDiv{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else if op == "mod" {
+	case "mod":
 		return &nodes.Mod{
 			Left:       left,
 			Right:      right,
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}
-	} else {
+	default:
 		panic("unknown operator")
 	}
 }
@@ -146,7 +148,8 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 
 	for p.stream.Bool() {
 		token := p.stream.Current()
-		if token.Type == lexer.TokenData {
+		switch token.Type {
+		case lexer.TokenData:
 			if token.Value != "" {
 				// type assert is safe, because token.Type == lexer.TokenData
 				addData(&nodes.TemplateData{
@@ -155,7 +158,7 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 				})
 			}
 			p.stream.Next()
-		} else if token.Type == lexer.TokenVariableBegin {
+		case lexer.TokenVariableBegin:
 			p.stream.Next()
 			tuple, err := p.parseTuple(false, true, nil, false)
 			if err != nil {
@@ -165,7 +168,7 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 			if _, err := p.stream.Expect(lexer.TokenVariableEnd); err != nil {
 				return nil, err
 			}
-		} else if token.Type == lexer.TokenBlockBegin {
+		case lexer.TokenBlockBegin:
 			flushData()
 			p.stream.Next()
 			if endTokens != nil && p.stream.Current().TestAny(endTokens...) {
@@ -179,7 +182,7 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 			if _, err := p.stream.Expect(lexer.TokenBlockEnd); err != nil {
 				return nil, err
 			}
-		} else {
+		default:
 			return nil, p.fail("internal parsing error", nil)
 		}
 	}
@@ -248,18 +251,21 @@ func (p *parser) parseTuple(simplified bool, withCondexpr bool, extraEndRules []
 func (p *parser) parsePrimary() (nodes.Node, error) {
 	token := p.stream.Current()
 	var node nodes.Node
-	if token.Type == lexer.TokenName {
-		if token.Value == "true" || token.Value == "false" || token.Value == "True" || token.Value == "False" {
+
+	switch token.Type {
+	case lexer.TokenName:
+		switch token.Value {
+		case "True", "False", "true", "false":
 			node = &nodes.Const{
 				Value:      token.Value == "true" || token.Value == "True",
 				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
 			}
-		} else if token.Value == "none" || token.Value == "None" {
+		case "None", "none":
 			node = &nodes.Const{
 				Value:      nil,
 				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
 			}
-		} else {
+		default:
 			node = &nodes.Name{
 				Name:       token.Value.(string),
 				Ctx:        "load",
@@ -268,7 +274,7 @@ func (p *parser) parsePrimary() (nodes.Node, error) {
 		}
 		p.stream.Next()
 		return node, nil
-	} else if token.Type == lexer.TokenString {
+	case lexer.TokenString:
 		p.stream.Next()
 		buf := []string{token.Value.(string)}
 		lineno := token.Lineno
@@ -280,13 +286,13 @@ func (p *parser) parsePrimary() (nodes.Node, error) {
 			Value:      strings.Join(buf, ""),
 			NodeCommon: nodes.NodeCommon{Lineno: lineno},
 		}, nil
-	} else if token.Type == lexer.TokenInteger || token.Type == lexer.TokenFloat {
+	case lexer.TokenInteger, lexer.TokenFloat:
 		p.stream.Next()
 		return &nodes.Const{
 			Value:      token.Value,
 			NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
 		}, nil
-	} else if token.Type == lexer.TokenLParen {
+	case lexer.TokenLParen:
 		p.stream.Next()
 		node, err := p.parseTuple(false, true, nil, true)
 		if err != nil {
@@ -296,11 +302,11 @@ func (p *parser) parsePrimary() (nodes.Node, error) {
 			return nil, err
 		}
 		return node, nil
-	} else if token.Type == lexer.TokenLBracket {
+	case lexer.TokenLBracket:
 		return p.parseList()
-	} else if token.Type == lexer.TokenLBrace {
+	case lexer.TokenLBrace:
 		return p.parseDict()
-	} else {
+	default:
 		return nil, p.fail(fmt.Sprintf("unexpected %q", lexer.DescribeToken(token)), &token.Lineno)
 	}
 }
@@ -482,7 +488,7 @@ func (p *parser) parseMath2() (nodes.Node, error) {
 		return nil, err
 	}
 
-	for p.stream.Current().Type == lexer.TokenMul || p.stream.Current().Type == lexer.TokenDiv || p.stream.Current().Type == lexer.TokenFloordiv || p.stream.Current().Type == lexer.TokenMod {
+	for slices.Contains([]string{lexer.TokenMul, lexer.TokenDiv, lexer.TokenFloordiv, lexer.TokenMod}, p.stream.Current().Type) {
 		currentType := p.stream.Current().Type
 		p.stream.Next()
 		right, err := p.parsePow()
@@ -544,34 +550,15 @@ func (p *parser) parsePow() (nodes.Node, error) {
 	return left, nil
 }
 
-func (p *parser) parseUnary(withFilter bool) (nodes.Node, error) {
-	//         token_type = self.stream.current.type
-	//        lineno = self.stream.current.lineno
-	//        node: nodes.Expr
-	//
-	//        if token_type == "sub":
-	//            next(self.stream)
-	//            node = nodes.Neg(self.parse_unary(False), lineno=lineno)
-	//        elif token_type == "add":
-	//            next(self.stream)
-	//            node = nodes.Pos(self.parse_unary(False), lineno=lineno)
-	//        else:
-	//            node = self.parse_primary()
-	//        node = self.parse_postfix(node)
-	//        if with_filter:
-	//            node = self.parse_filter_expr(node)
-	//        return node
-
+func (p *parser) parseUnary(withFilter bool) (node nodes.Node, err error) {
 	lineno := p.stream.Current().Lineno
 	tokenType := p.stream.Current().Type
-	var node nodes.Node
-	var err error
 
 	if tokenType == lexer.TokenSub || tokenType == lexer.TokenAdd {
 		p.stream.Next()
 		node, err = p.parseUnary(false)
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 	if tokenType == lexer.TokenSub {
@@ -587,20 +574,20 @@ func (p *parser) parseUnary(withFilter bool) (nodes.Node, error) {
 	} else {
 		node, err = p.parsePrimary()
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 
 	node, err = p.parsePostfix(node)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	if withFilter {
 		node, err = p.parseFilterExpr(node)
 	}
 
-	return node, err
+	return
 }
 
 func (p *parser) parsePostfix(node nodes.Node) (nodes.Node, error) {
@@ -800,15 +787,13 @@ func (p *parser) parseCall(node nodes.Node) (nodes.Node, error) {
 	}, nil
 }
 
-func (p *parser) parseCallArgs() ([]nodes.Node, []nodes.Node, *nodes.Node, *nodes.Node, error) {
-	token, err := p.stream.Expect(lexer.TokenLParen)
+func (p *parser) parseCallArgs() (args []nodes.Node, kwargs []nodes.Node, dynArgs *nodes.Node, dynKwargs *nodes.Node, err error) {
+	var token *lexer.Token
+	token, err = p.stream.Expect(lexer.TokenLParen)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return
 	}
-	var args []nodes.Node
-	var kwargs []nodes.Node
-	var dynArgs *nodes.Node
-	var dynKwargs *nodes.Node
+
 	requireComma := false
 
 	ensure := func(expr bool) error {
@@ -820,8 +805,8 @@ func (p *parser) parseCallArgs() ([]nodes.Node, []nodes.Node, *nodes.Node, *node
 
 	for p.stream.Current().Type != lexer.TokenRParen {
 		if requireComma {
-			if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
-				return nil, nil, nil, nil, err
+			if _, err = p.stream.Expect(lexer.TokenComma); err != nil {
+				return
 			}
 			// support for trailing comma
 			if p.stream.Current().Type == lexer.TokenRParen {
@@ -829,63 +814,62 @@ func (p *parser) parseCallArgs() ([]nodes.Node, []nodes.Node, *nodes.Node, *node
 			}
 		}
 
+		var expr nodes.Node
 		if p.stream.Current().Type == lexer.TokenMul {
-			if err := ensure(dynArgs == nil && dynKwargs == nil); err != nil {
-				return nil, nil, nil, nil, err
+			if err = ensure(dynArgs == nil && dynKwargs == nil); err != nil {
+				return
 			}
 			p.stream.Next()
-			e, err := p.parseExpression(true)
+			expr, err = p.parseExpression(true)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return
 			}
-			dynArgs = &e
+			dynArgs = &expr
 		} else if p.stream.Current().Type == lexer.TokenPow {
-			if err := ensure(dynKwargs == nil); err != nil {
-				return nil, nil, nil, nil, err
+			if err = ensure(dynKwargs == nil); err != nil {
+				return
 			}
 			p.stream.Next()
-			e, err := p.parseExpression(true)
+			expr, err = p.parseExpression(true)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return
 			}
-			dynKwargs = &e
+			dynKwargs = &expr
 		} else {
 			if p.stream.Current().Type == lexer.TokenName && p.stream.Look().Type == lexer.TokenAssign {
 				// Parsing a kwarg
-				if err := ensure(dynKwargs == nil); err != nil {
-					return nil, nil, nil, nil, err
+				if err = ensure(dynKwargs == nil); err != nil {
+					return
 				}
 				key := p.stream.Current().Value
 				p.stream.Skip(2)
-				value, err := p.parseExpression(true)
+				expr, err = p.parseExpression(true)
 				if err != nil {
-					return nil, nil, nil, nil, err
+					return
 				}
 				kwargs = append(kwargs, &nodes.Keyword{
 					Key:        key.(string),
-					Value:      value,
-					NodeCommon: nodes.NodeCommon{Lineno: value.GetLineno()},
+					Value:      expr,
+					NodeCommon: nodes.NodeCommon{Lineno: expr.GetLineno()},
 				})
 			} else {
 				// Parsing an arg
-				if err := ensure(dynArgs == nil && dynKwargs == nil && len(kwargs) == 0); err != nil {
-					return nil, nil, nil, nil, err
+				if err = ensure(dynArgs == nil && dynKwargs == nil && len(kwargs) == 0); err != nil {
+					return
 				}
-				arg, err := p.parseExpression(true)
+				expr, err = p.parseExpression(true)
 				if err != nil {
-					return nil, nil, nil, nil, err
+					return
 				}
-				args = append(args, arg)
+				args = append(args, expr)
 			}
 		}
 
 		requireComma = true
 	}
 
-	if _, err := p.stream.Expect(lexer.TokenRParen); err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return args, kwargs, dynArgs, dynKwargs, nil
+	_, err = p.stream.Expect(lexer.TokenRParen)
+	return
 }
 
 func (p *parser) parseFilter(node nodes.Node, startInline bool) (nodes.Node, error) {
@@ -917,9 +901,6 @@ func (p *parser) parseFilter(node nodes.Node, startInline bool) (nodes.Node, err
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			args = []nodes.Node{}
-			kwargs = []nodes.Node{}
 		}
 
 		node = &nodes.Filter{
@@ -954,7 +935,7 @@ func (p *parser) parseDict() (nodes.Node, error) {
 
 func (p *parser) isTupleEnd(extraEndRules []string) bool {
 	current := p.stream.Current()
-	if current.Type == lexer.TokenVariableEnd || current.Type == lexer.TokenBlockEnd || current.Type == lexer.TokenRParen {
+	if slices.Contains([]string{lexer.TokenVariableEnd, lexer.TokenBlockEnd, lexer.TokenRParen}, current.Type) {
 		return true
 	} else if extraEndRules != nil {
 		return current.TestAny(extraEndRules...)
@@ -1184,7 +1165,7 @@ func (p *parser) failEOF(endTokens []string, lineno *int) error {
 }
 
 func (p *parser) failUtEof(name *string, endTokenStack *stack.Stack[[]string], lineno *int) error {
-	endTokenStackSlice := endTokenStack.AsSlice()
+	endTokenStackSlice := endTokenStack.Iter()
 	expected := set.New[string]()
 
 	for _, exprs := range endTokenStackSlice {
@@ -1219,9 +1200,8 @@ func (p *parser) failUtEof(name *string, endTokenStack *stack.Stack[[]string], l
 		}
 	}
 
-	if p.tagStack.Len() > 0 {
-		lastTag := *p.tagStack.Peek()
-		messages = append(messages, fmt.Sprintf("The innermost block that needs to be closed is %q.", lastTag))
+	if lastTag := p.tagStack.Peek(); lastTag != nil {
+		messages = append(messages, fmt.Sprintf("The innermost block that needs to be closed is %q.", *lastTag))
 	}
 
 	return p.fail(strings.Join(messages, " "), lineno)
