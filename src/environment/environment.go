@@ -80,6 +80,9 @@ func New(opts *EnvOpts) (*Environment, error) {
 		Policies:            maps.Copy(defaults.DefaultPolicies),
 	}
 	env.AutoEscape, err = convertAutoEscape(opts.AutoEscape)
+	if err != nil {
+		return nil, err
+	}
 
 	env.Cache, err = createCache(opts.CacheSize)
 	if err != nil {
