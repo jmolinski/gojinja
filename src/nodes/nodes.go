@@ -133,7 +133,7 @@ func (s *Scope) SetCtx(ctx string) {
 
 type FilterBlock struct {
 	Body   []Node
-	Filter Filter
+	Filter *Filter
 	StmtCommon
 }
 
@@ -362,12 +362,12 @@ func (c *Call) SetCtx(ctx string) {
 }
 
 type FilterTestCommon struct {
-	Node      *Node
+	Node      *Expr
 	Name      string
-	Args      []Node
-	Kwargs    []Node
-	DynArgs   *Node
-	DynKwargs *Node
+	Args      []Expr
+	Kwargs    []Keyword // Jinja uses Pair but then other methods returns Keyword instead of Pair -_-
+	DynArgs   *Expr
+	DynKwargs *Expr
 	ExprCommon
 }
 

@@ -76,7 +76,7 @@ var cases = []parserTest{
 				},
 				&nodes.Output{
 					Nodes: []nodes.Node{
-						&nodes.BinOp{
+						&nodes.BinExpr{
 							Left: &nodes.Const{
 								Value:      int64(5),
 								NodeCommon: nodes.NodeCommon{Lineno: 1},

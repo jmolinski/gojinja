@@ -9,6 +9,7 @@ import (
 	"github.com/gojinja/gojinja/src/utils/set"
 	"github.com/gojinja/gojinja/src/utils/slices"
 	"github.com/gojinja/gojinja/src/utils/stack"
+	"reflect"
 	"strings"
 )
 
@@ -31,12 +32,12 @@ var compareOperators = set.FrozenFromElems(
 	"eq", "ne", "lt", "lteq", "gt", "gteq",
 )
 
-func makeBinaryOpNode(left, right nodes.Node, op string, lineno int) nodes.Node {
-	return &nodes.BinOp{
+func makeBinaryOpExpr(left, right nodes.Expr, op string, lineno int) nodes.Expr {
+	return &nodes.BinExpr{
 		Left:       left,
 		Right:      right,
 		Op:         op,
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}
 }
 
@@ -91,8 +92,8 @@ func (p *parser) Parse() (*nodes.Template, error) {
 
 func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 	body := make([]nodes.Node, 0)
-	dataBuffer := make([]nodes.Node, 0)
-	addData := func(node nodes.Node) {
+	dataBuffer := make([]nodes.Expr, 0)
+	addData := func(node nodes.Expr) {
 		dataBuffer = append(dataBuffer, node)
 	}
 
@@ -106,9 +107,9 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 			lineno := dataBuffer[0].GetLineno()
 			body = append(body, &nodes.Output{
 				Nodes:      dataBuffer,
-				NodeCommon: nodes.NodeCommon{Lineno: lineno},
+				StmtCommon: nodes.StmtCommon{Lineno: lineno},
 			})
-			dataBuffer = make([]nodes.Node, 0)
+			dataBuffer = make([]nodes.Expr, 0)
 		}
 	}
 
@@ -119,8 +120,8 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 			if token.Value != "" {
 				// type assert is safe, because token.Type == lexer.TokenData
 				addData(&nodes.TemplateData{
-					Data:       token.Value.(string),
-					NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+					Data:          token.Value.(string),
+					LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 				})
 			}
 			p.stream.Next()
@@ -157,18 +158,18 @@ func (p *parser) subparse(endTokens []string) ([]nodes.Node, error) {
 	return body, nil
 }
 
-func (p *parser) parseTuple(simplified bool, withCondexpr bool, extraEndRules []string, explicitParentheses bool) (nodes.Node, error) {
+func (p *parser) parseTuple(simplified bool, withCondexpr bool, extraEndRules []string, explicitParentheses bool) (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
-	var parse func() (nodes.Node, error)
+	var parse func() (nodes.Expr, error)
 	if simplified {
 		parse = p.parsePrimary
 	} else {
-		parse = func() (nodes.Node, error) {
+		parse = func() (nodes.Expr, error) {
 			return p.parseExpression(withCondexpr)
 		}
 	}
 
-	var args []nodes.Node
+	var args []nodes.Expr
 	var isTuple bool
 
 	for {
@@ -208,34 +209,34 @@ func (p *parser) parseTuple(simplified bool, withCondexpr bool, extraEndRules []
 	}
 
 	return &nodes.Tuple{
-		Items:      args,
-		Ctx:        "load",
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		Items:         args,
+		Ctx:           "load",
+		LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}, nil
 }
 
-func (p *parser) parsePrimary() (nodes.Node, error) {
+func (p *parser) parsePrimary() (nodes.Expr, error) {
 	token := p.stream.Current()
-	var node nodes.Node
+	var node nodes.Expr
 
 	switch token.Type {
 	case lexer.TokenName:
 		switch token.Value {
 		case "True", "False", "true", "false":
 			node = &nodes.Const{
-				Value:      token.Value == "true" || token.Value == "True",
-				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+				Value:         token.Value == "true" || token.Value == "True",
+				LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 			}
 		case "None", "none":
 			node = &nodes.Const{
-				Value:      nil,
-				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+				Value:         nil,
+				LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 			}
 		default:
 			node = &nodes.Name{
 				Name:       token.Value.(string),
 				Ctx:        "load",
-				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+				ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 			}
 		}
 		p.stream.Next()
@@ -243,20 +244,19 @@ func (p *parser) parsePrimary() (nodes.Node, error) {
 	case lexer.TokenString:
 		p.stream.Next()
 		buf := []string{token.Value.(string)}
-		lineno := token.Lineno
 		for p.stream.Current().Type == lexer.TokenString {
 			buf = append(buf, p.stream.Current().Value.(string))
 			p.stream.Next()
 		}
 		return &nodes.Const{
-			Value:      strings.Join(buf, ""),
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
+			Value:         strings.Join(buf, ""),
+			LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 		}, nil
 	case lexer.TokenInteger, lexer.TokenFloat:
 		p.stream.Next()
 		return &nodes.Const{
-			Value:      token.Value,
-			NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+			Value:         token.Value,
+			LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 		}, nil
 	case lexer.TokenLParen:
 		p.stream.Next()
@@ -277,20 +277,20 @@ func (p *parser) parsePrimary() (nodes.Node, error) {
 	}
 }
 
-func (p *parser) parseExpression(withCondexpr bool) (nodes.Node, error) {
+func (p *parser) parseExpression(withCondexpr bool) (nodes.Expr, error) {
 	if withCondexpr {
 		return p.parseCondexpr()
 	}
 	return p.parseOr()
 }
 
-func (p *parser) parseCondexpr() (nodes.Node, error) {
+func (p *parser) parseCondexpr() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	expr1, err := p.parseOr()
 	if err != nil {
 		return nil, err
 	}
-	var expr3 nodes.Node
+	var expr3 *nodes.Expr
 
 	for p.stream.SkipIf("name:if") {
 		expr2, err := p.parseOr()
@@ -298,10 +298,11 @@ func (p *parser) parseCondexpr() (nodes.Node, error) {
 			return nil, err
 		}
 		if p.stream.SkipIf("name:else") {
-			expr3, err = p.parseCondexpr()
+			expr3H, err := p.parseCondexpr()
 			if err != nil {
 				return nil, err
 			}
+			expr3 = &expr3H
 		} else {
 			expr3 = nil
 		}
@@ -309,7 +310,7 @@ func (p *parser) parseCondexpr() (nodes.Node, error) {
 			Test:       expr2,
 			Expr1:      expr1,
 			Expr2:      expr3,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
+			ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 		}
 		lineno = p.stream.Current().Lineno
 	}
@@ -317,7 +318,7 @@ func (p *parser) parseCondexpr() (nodes.Node, error) {
 	return expr1, nil
 }
 
-func (p *parser) parseOr() (nodes.Node, error) {
+func (p *parser) parseOr() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	left, err := p.parseAnd()
 	if err != nil {
@@ -328,13 +329,13 @@ func (p *parser) parseOr() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryOpNode(left, right, "or", lineno)
+		left = makeBinaryOpExpr(left, right, "or", lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 }
 
-func (p *parser) parseAnd() (nodes.Node, error) {
+func (p *parser) parseAnd() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	left, err := p.parseNot()
 	if err != nil {
@@ -345,29 +346,29 @@ func (p *parser) parseAnd() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryOpNode(left, right, "and", lineno)
+		left = makeBinaryOpExpr(left, right, "and", lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 }
 
-func (p *parser) parseNot() (nodes.Node, error) {
+func (p *parser) parseNot() (nodes.Expr, error) {
 	if p.stream.Current().Test("name:not") {
 		lineno := p.stream.Next().Lineno
 		n, err := p.parseNot()
 		if err != nil {
 			return nil, err
 		}
-		return &nodes.UnaryOp{
+		return &nodes.UnaryExpr{
 			Node:       n,
 			Op:         "not",
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
+			ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 		}, nil
 	}
 	return p.parseCompare()
 }
 
-func (p *parser) parseCompare() (nodes.Node, error) {
+func (p *parser) parseCompare() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	expr, err := p.parseMath1()
 	if err != nil {
@@ -381,9 +382,9 @@ func (p *parser) parseCompare() (nodes.Node, error) {
 			return err
 		}
 		ops = append(ops, nodes.Operand{
-			Op:         tokenType,
-			Expr:       e,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
+			Op:           tokenType,
+			Expr:         e,
+			HelperCommon: nodes.HelperCommon{Lineno: lineno},
 		})
 		return nil
 	}
@@ -416,11 +417,11 @@ func (p *parser) parseCompare() (nodes.Node, error) {
 	return &nodes.Compare{
 		Expr:       expr,
 		Ops:        ops,
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}, nil
 }
 
-func (p *parser) parseMath1() (nodes.Node, error) {
+func (p *parser) parseMath1() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	left, err := p.parseConcat()
 	if err != nil {
@@ -434,13 +435,13 @@ func (p *parser) parseMath1() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryOpNode(left, right, currentType, lineno)
+		left = makeBinaryOpExpr(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 }
 
-func (p *parser) parseMath2() (nodes.Node, error) {
+func (p *parser) parseMath2() (nodes.Expr, error) {
 	// TODO it's almost identical as parseMath1
 	lineno := p.stream.Current().Lineno
 	left, err := p.parsePow()
@@ -455,20 +456,20 @@ func (p *parser) parseMath2() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryOpNode(left, right, currentType, lineno)
+		left = makeBinaryOpExpr(left, right, currentType, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 
 }
 
-func (p *parser) parseConcat() (nodes.Node, error) {
+func (p *parser) parseConcat() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	left, err := p.parseMath2()
 	if err != nil {
 		return nil, err
 	}
-	args := []nodes.Node{left}
+	args := []nodes.Expr{left}
 
 	for p.stream.Current().Type == lexer.TokenTilde {
 		p.stream.Next()
@@ -483,11 +484,11 @@ func (p *parser) parseConcat() (nodes.Node, error) {
 	}
 	return &nodes.Concat{
 		Nodes:      args,
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}, nil
 }
 
-func (p *parser) parsePow() (nodes.Node, error) {
+func (p *parser) parsePow() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	left, err := p.parseUnary(true)
 	if err != nil {
@@ -500,13 +501,13 @@ func (p *parser) parsePow() (nodes.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		left = makeBinaryOpNode(left, right, lexer.TokenPow, lineno)
+		left = makeBinaryOpExpr(left, right, lexer.TokenPow, lineno)
 		lineno = p.stream.Current().Lineno
 	}
 	return left, nil
 }
 
-func (p *parser) parseUnary(withFilter bool) (node nodes.Node, err error) {
+func (p *parser) parseUnary(withFilter bool) (node nodes.Expr, err error) {
 	lineno := p.stream.Current().Lineno
 	tokenType := p.stream.Current().Type
 
@@ -516,10 +517,10 @@ func (p *parser) parseUnary(withFilter bool) (node nodes.Node, err error) {
 		if err != nil {
 			return
 		}
-		node = &nodes.UnaryOp{
+		node = &nodes.UnaryExpr{
 			Node:       node,
 			Op:         tokenType,
-			NodeCommon: nodes.NodeCommon{Lineno: lineno},
+			ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 		}
 	} else {
 		node, err = p.parsePrimary()
@@ -540,7 +541,7 @@ func (p *parser) parseUnary(withFilter bool) (node nodes.Node, err error) {
 	return
 }
 
-func (p *parser) parsePostfix(node nodes.Node) (nodes.Node, error) {
+func (p *parser) parsePostfix(node nodes.Expr) (nodes.Expr, error) {
 	var err error
 
 	for {
@@ -563,16 +564,17 @@ func (p *parser) parsePostfix(node nodes.Node) (nodes.Node, error) {
 	return node, nil
 }
 
-func (p *parser) parseFilterExpr(node nodes.Node) (nodes.Node, error) {
+func (p *parser) parseFilterExpr(node nodes.Expr) (nodes.Expr, error) {
 	var err error
 
 	for {
 		tokenType := p.stream.Current().Type
 		if tokenType == lexer.TokenPipe {
-			node, err = p.parseFilter(node, false)
+			nP, err := p.parseFilter(&node, false)
 			if err != nil {
 				return nil, err
 			}
+			node = *nP
 		} else if tokenType == lexer.TokenName && p.stream.Current().Value == "is" {
 			node, err = p.parseTest(node)
 			if err != nil {
@@ -591,9 +593,9 @@ func (p *parser) parseFilterExpr(node nodes.Node) (nodes.Node, error) {
 	return node, nil
 }
 
-func (p *parser) parseSubscript(node nodes.Node) (nodes.Node, error) {
+func (p *parser) parseSubscript(node nodes.Expr) (nodes.Expr, error) {
 	token := p.stream.Next()
-	var arg nodes.Node
+	var arg nodes.Expr
 
 	if token.Type == lexer.TokenDot {
 		attrToken := p.stream.Current()
@@ -603,23 +605,23 @@ func (p *parser) parseSubscript(node nodes.Node) (nodes.Node, error) {
 				Node:       node,
 				Attr:       attrToken.Value.(string),
 				Ctx:        "load",
-				NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno},
+				ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno}},
 			}, nil
 		} else if attrToken.Type != lexer.TokenInteger {
 			return nil, p.fail(fmt.Sprintf("expected name or number, got %s", attrToken.Type), &attrToken.Lineno)
 		}
 		arg = &nodes.Const{
-			Value:      attrToken.Value,
-			NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno},
+			Value:         attrToken.Value,
+			LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno}},
 		}
 		return &nodes.Getitem{
 			Node:       node,
 			Arg:        arg,
 			Ctx:        "load",
-			NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno},
+			ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: attrToken.Lineno}},
 		}, nil
 	} else if token.Type == lexer.TokenLBracket {
-		var args []nodes.Node
+		var args []nodes.Expr
 		for p.stream.Current().Type != lexer.TokenRBracket {
 			if len(args) > 0 {
 				if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
@@ -640,9 +642,9 @@ func (p *parser) parseSubscript(node nodes.Node) (nodes.Node, error) {
 			arg = args[0]
 		} else {
 			arg = &nodes.Tuple{
-				Items:      args,
-				Ctx:        "load",
-				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+				Items:         args,
+				Ctx:           "load",
+				LiteralCommon: nodes.LiteralCommon{nodes.NodeCommon{Lineno: token.Lineno}},
 			}
 		}
 
@@ -650,20 +652,20 @@ func (p *parser) parseSubscript(node nodes.Node) (nodes.Node, error) {
 			Node:       node,
 			Arg:        arg,
 			Ctx:        "load",
-			NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+			ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 		}, nil
 	}
 
 	return nil, p.fail("expected subscript expression", &token.Lineno)
 }
 
-func (p *parser) parseSubscribed() (nodes.Node, error) {
+func (p *parser) parseSubscribed() (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
-	var args []*nodes.Node
+	var args []*nodes.Expr
 
 	if p.stream.Current().Type == lexer.TokenColon {
 		p.stream.Next()
-		args = []*nodes.Node{nil}
+		args = []*nodes.Expr{nil}
 	} else {
 		node, err := p.parseExpression(true)
 		if err != nil {
@@ -673,7 +675,7 @@ func (p *parser) parseSubscribed() (nodes.Node, error) {
 			return node, nil
 		}
 		p.stream.Next()
-		args = []*nodes.Node{&node}
+		args = []*nodes.Expr{&node}
 	}
 
 	if p.stream.Current().Type == lexer.TokenColon {
@@ -703,7 +705,7 @@ func (p *parser) parseSubscribed() (nodes.Node, error) {
 		args = append(args, nil)
 	}
 
-	var start, stop, step *nodes.Node
+	var start, stop, step *nodes.Expr
 	if len(args) > 0 {
 		start = args[0]
 	}
@@ -717,11 +719,11 @@ func (p *parser) parseSubscribed() (nodes.Node, error) {
 		Start:      start,
 		Stop:       stop,
 		Step:       step,
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}, nil
 }
 
-func (p *parser) parseCall(node nodes.Node) (nodes.Node, error) {
+func (p *parser) parseCall(node nodes.Expr) (nodes.Expr, error) {
 	lineno := p.stream.Current().Lineno
 	args, kwargs, dynArgs, dynKwargs, err := p.parseCallArgs()
 	if err != nil {
@@ -733,11 +735,11 @@ func (p *parser) parseCall(node nodes.Node) (nodes.Node, error) {
 		Kwargs:     kwargs,
 		DynArgs:    dynArgs,
 		DynKwargs:  dynKwargs,
-		NodeCommon: nodes.NodeCommon{Lineno: lineno},
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: lineno}},
 	}, nil
 }
 
-func (p *parser) parseCallArgs() (args []nodes.Node, kwargs []nodes.Node, dynArgs *nodes.Node, dynKwargs *nodes.Node, err error) {
+func (p *parser) parseCallArgs() (args []nodes.Expr, kwargs []nodes.Keyword, dynArgs *nodes.Expr, dynKwargs *nodes.Expr, err error) {
 	var token *lexer.Token
 	token, err = p.stream.Expect(lexer.TokenLParen)
 	if err != nil {
@@ -764,7 +766,7 @@ func (p *parser) parseCallArgs() (args []nodes.Node, kwargs []nodes.Node, dynArg
 			}
 		}
 
-		var expr nodes.Node
+		var expr nodes.Expr
 		if p.stream.Current().Type == lexer.TokenMul {
 			if err = ensure(dynArgs == nil && dynKwargs == nil); err != nil {
 				return
@@ -797,10 +799,10 @@ func (p *parser) parseCallArgs() (args []nodes.Node, kwargs []nodes.Node, dynArg
 				if err != nil {
 					return
 				}
-				kwargs = append(kwargs, &nodes.Keyword{
-					Key:        key.(string),
-					Value:      expr,
-					NodeCommon: nodes.NodeCommon{Lineno: expr.GetLineno()},
+				kwargs = append(kwargs, nodes.Keyword{
+					Key:          key.(string),
+					Value:        expr,
+					HelperCommon: nodes.HelperCommon{Lineno: expr.GetLineno()},
 				})
 			} else {
 				// Parsing an arg
@@ -822,7 +824,7 @@ func (p *parser) parseCallArgs() (args []nodes.Node, kwargs []nodes.Node, dynArg
 	return
 }
 
-func (p *parser) parseFilter(node nodes.Node, startInline bool) (nodes.Node, error) {
+func (p *parser) parseFilter(node *nodes.Expr, startInline bool) (*nodes.Expr, error) {
 	for p.stream.Current().Type == lexer.TokenPipe || startInline {
 		if !startInline {
 			p.stream.Next()
@@ -842,10 +844,10 @@ func (p *parser) parseFilter(node nodes.Node, startInline bool) (nodes.Node, err
 			name += "." + token.Value.(string)
 		}
 
-		var args []nodes.Node
-		var kwargs []nodes.Node
-		var dynArgs *nodes.Node
-		var dynKwargs *nodes.Node
+		var args []nodes.Expr
+		var kwargs []nodes.Keyword
+		var dynArgs *nodes.Expr
+		var dynKwargs *nodes.Expr
 		if p.stream.Current().Type == lexer.TokenLParen {
 			args, kwargs, dynArgs, dynKwargs, err = p.parseCallArgs()
 			if err != nil {
@@ -853,32 +855,35 @@ func (p *parser) parseFilter(node nodes.Node, startInline bool) (nodes.Node, err
 			}
 		}
 
-		node = &nodes.Filter{
-			Node:       node,
-			Name:       name,
-			Args:       args,
-			Kwargs:     kwargs,
-			DynArgs:    dynArgs,
-			DynKwargs:  dynKwargs,
-			NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+		var f nodes.Expr = &nodes.Filter{
+			FilterTestCommon: nodes.FilterTestCommon{
+				Node:       node,
+				Name:       name,
+				Args:       args,
+				Kwargs:     kwargs,
+				DynArgs:    dynArgs,
+				DynKwargs:  dynKwargs,
+				ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
+			},
 		}
+		node = &f
 
 		startInline = false
 	}
 	return node, nil
 }
 
-func (p *parser) parseTest(node nodes.Node) (nodes.Node, error) {
+func (p *parser) parseTest(node nodes.Node) (nodes.Expr, error) {
 	// TODO
 	panic("not implemented")
 }
 
-func (p *parser) parseList() (nodes.Node, error) {
+func (p *parser) parseList() (nodes.Expr, error) {
 	// TODO
 	panic("not implemented")
 }
 
-func (p *parser) parseDict() (nodes.Node, error) {
+func (p *parser) parseDict() (nodes.Expr, error) {
 	// TODO
 	panic("not implemented")
 }
@@ -982,7 +987,7 @@ func (p *parser) parseIf() (nodes.Node, error) {
 		return nil, err
 	}
 	node := &nodes.If{
-		NodeCommon: nodes.NodeCommon{Lineno: tok.Lineno},
+		StmtCommon: nodes.StmtCommon{Lineno: tok.Lineno},
 	}
 	result := node
 
@@ -1000,7 +1005,7 @@ func (p *parser) parseIf() (nodes.Node, error) {
 		token := p.stream.Next()
 		if token.Test("name:elif") {
 			node = &nodes.If{
-				NodeCommon: nodes.NodeCommon{Lineno: token.Lineno},
+				StmtCommon: nodes.StmtCommon{Lineno: token.Lineno},
 			}
 			result.Elif = append(result.Elif, *node)
 			continue
@@ -1046,7 +1051,7 @@ func (p *parser) parseBlock() (nodes.Node, error) {
 
 func (p *parser) parseExtends() (nodes.Node, error) {
 	node := &nodes.Extends{
-		NodeCommon: nodes.NodeCommon{Lineno: p.stream.Next().Lineno},
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
 	}
 	var err error
 	node.Template, err = p.parseExpression(true)
@@ -1058,8 +1063,8 @@ func (p *parser) parseExtends() (nodes.Node, error) {
 
 func (p *parser) parsePrint() (nodes.Node, error) {
 	node := &nodes.Output{
-		NodeCommon: nodes.NodeCommon{Lineno: p.stream.Next().Lineno},
-		Nodes:      make([]nodes.Node, 0),
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+		Nodes:      make([]nodes.Expr, 0),
 	}
 	for p.stream.Current().Type != lexer.TokenBlockEnd {
 		if len(node.Nodes) > 0 {
@@ -1078,13 +1083,13 @@ func (p *parser) parsePrint() (nodes.Node, error) {
 }
 
 func (p *parser) parseMacro() (nodes.Node, error) {
-	n := &nodes.Macro{NodeCommon: nodes.NodeCommon{Lineno: p.stream.Next().Lineno}}
+	n := &nodes.Macro{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
 
-	name, err := p.parseAssignTarget(true, true, nil, false)
+	name, err := p.parseAssignTargetName()
 	if err != nil {
 		return nil, err
 	}
-	n.Name = name.Name
+	n.Name = name.GetName()
 	if err = p.parseSignature(&n.MacroCall); err != nil {
 		return nil, err
 	}
@@ -1125,7 +1130,7 @@ func (p *parser) parseAutoescape() (nodes.Node, error) {
 	node := &nodes.ScopedEvalContextModifier{
 		EvalContextModifier: nodes.EvalContextModifier{
 			Options:    make([]nodes.Keyword, 1),
-			NodeCommon: nodes.NodeCommon{Lineno: p.stream.Next().Lineno},
+			StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
 		},
 	}
 	optsExpr, err := p.parseExpression(true)
@@ -1133,9 +1138,9 @@ func (p *parser) parseAutoescape() (nodes.Node, error) {
 		return nil, err
 	}
 	node.Options[0] = nodes.Keyword{
-		Key:        "autoescape",
-		Value:      optsExpr,
-		NodeCommon: nodes.NodeCommon{Lineno: optsExpr.GetLineno()},
+		Key:          "autoescape",
+		Value:        optsExpr,
+		HelperCommon: nodes.HelperCommon{Lineno: optsExpr.GetLineno()},
 	}
 	node.Body, err = p.parseStatements([]string{"name:endautoescape"}, true)
 	if err != nil {
@@ -1153,14 +1158,23 @@ func (p *parser) parseCallBlock() ([]nodes.Node, error) {
 
 func (p *parser) parseFilterBlock() (nodes.Node, error) {
 	node := &nodes.FilterBlock{
-		NodeCommon: nodes.NodeCommon{Lineno: p.stream.Next().Lineno},
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
 	}
 
 	var err error
-	node.Filter, err = p.parseFilter(nil, true)
+	nP, err := p.parseFilter(nil, true)
 	if err != nil {
 		return nil, err
 	}
+	if nP == nil {
+		return nil, fmt.Errorf("couldn't parse filter")
+	}
+	if f, ok := (*nP).(*nodes.Filter); ok {
+		node.Filter = f
+	} else {
+		return nil, fmt.Errorf("couldn't parse filter")
+	}
+
 	node.Body, err = p.parseStatements([]string{"name:endfilter"}, true)
 	if err != nil {
 		return nil, err
@@ -1169,9 +1183,55 @@ func (p *parser) parseFilterBlock() (nodes.Node, error) {
 	return node, nil
 }
 
-func (p *parser) parseAssignTarget(withTuple bool, nameOnly bool, extraEndRule []string, withNamespace bool) (nodes.Name, error) {
-	// TODO
-	panic("TODO")
+func (p *parser) parseAssignTargetName() (target *nodes.Name, err error) {
+	token, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	target = &nodes.Name{
+		Name:       fmt.Sprint(token.Value),
+		Ctx:        "store",
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
+	}
+
+	return
+}
+
+func (p *parser) parseAssignTargetNameNamespace() (target nodes.ExprWithName, err error) {
+	if p.stream.Look().Type == lexer.TokenDot {
+		target, err = p.parseNSRef()
+	} else {
+		target, err = p.parseAssignTargetName()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
+	}
+
+	return
+}
+
+func (p *parser) parseNSRef() (*nodes.NSRef, error) {
+	token, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.stream.Expect(lexer.TokenDot)
+	if err != nil {
+		return nil, err
+	}
+	attr, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.NSRef{
+		Name:       fmt.Sprint(token.Value),
+		Attr:       fmt.Sprint(attr.Value),
+		ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
+	}, nil
 }
 
 func (p *parser) parseSignature(n *nodes.MacroCall) error {
@@ -1186,11 +1246,11 @@ func (p *parser) parseSignature(n *nodes.MacroCall) error {
 				return err
 			}
 		}
-		arg, err := p.parseAssignTarget(true, true, nil, false)
+		arg, err := p.parseAssignTargetName()
 		if err != nil {
 			return err
 		}
-		arg.Ctx = "param"
+		arg.SetCtx("param")
 		if p.stream.SkipIf(lexer.TokenAssign) {
 			expr, err := p.parseExpression(true)
 			if err != nil {
@@ -1200,7 +1260,7 @@ func (p *parser) parseSignature(n *nodes.MacroCall) error {
 		} else if len(n.Defaults) != 0 {
 			return p.fail("non-default argument follows default argument", nil)
 		}
-		n.Args = append(n.Args, arg)
+		n.Args = append(n.Args, *arg)
 	}
 	_, err := p.stream.Expect(lexer.TokenRParen)
 	return err
