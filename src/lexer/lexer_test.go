@@ -87,3 +87,25 @@ func TestCountNewlines(t *testing.T) {
 		t.Fatal("expected 6 newlines")
 	}
 }
+
+type unescapeStringTest struct {
+	unescaped string
+	escape    string
+}
+
+var unescapeStringCases = []unescapeStringTest{
+	{"a\\\"b\\\"", "a\"b\""},
+	{"a\\'b\\'", "a'b'"},
+	{"a\\'b\\\"", "a'b\""},
+	{"a\\\\'b\\\"", "a\\\\'b\""},
+	{"a", "a"},
+}
+
+func TestUnescapeString(t *testing.T) {
+	for _, c := range unescapeStringCases {
+		res := unescapeString(c.unescaped)
+		if res != unescapeString(c.escape) {
+			t.Fatal("got: ", c.unescaped, "expected: ", c.escape)
+		}
+	}
+}
