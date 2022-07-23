@@ -22,7 +22,7 @@ var cases = []parserTest{
 						&nodes.Name{
 							Name:       "name",
 							Ctx:        "load",
-							ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+							ExprCommon: nodes.ExprCommon{Lineno: 1},
 						},
 					},
 					StmtCommon: nodes.StmtCommon{Lineno: 1},
@@ -40,31 +40,31 @@ var cases = []parserTest{
 						Expr: &nodes.Name{
 							Name:       "abc",
 							Ctx:        "load",
-							ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+							ExprCommon: nodes.ExprCommon{Lineno: 1},
 						},
 						Ops: []nodes.Operand{
 							{
 								Op: "ne",
 								Expr: &nodes.Const{
 									Value:         "OFF",
-									LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+									LiteralCommon: nodes.LiteralCommon{Lineno: 1},
 								},
 								HelperCommon: nodes.HelperCommon{Lineno: 1},
 							},
 						},
-						ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+						ExprCommon: nodes.ExprCommon{Lineno: 1},
 					},
 					Body: []nodes.Node{
 						&nodes.Output{
 							Nodes: []nodes.Expr{
 								&nodes.TemplateData{
 									Data:          "my name is ",
-									LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+									LiteralCommon: nodes.LiteralCommon{Lineno: 1},
 								},
 								&nodes.Name{
 									Name:       "abc",
 									Ctx:        "load",
-									ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+									ExprCommon: nodes.ExprCommon{Lineno: 1},
 								},
 							},
 							StmtCommon: nodes.StmtCommon{Lineno: 1},
@@ -79,14 +79,14 @@ var cases = []parserTest{
 						&nodes.BinExpr{
 							Left: &nodes.Const{
 								Value:         int64(5),
-								LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+								LiteralCommon: nodes.LiteralCommon{Lineno: 1},
 							},
 							Right: &nodes.Const{
 								Value:         int64(1),
-								LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+								LiteralCommon: nodes.LiteralCommon{Lineno: 1},
 							},
 							Op:         lexer.TokenAdd,
-							ExprCommon: nodes.ExprCommon{NodeCommon: nodes.NodeCommon{Lineno: 1}},
+							ExprCommon: nodes.ExprCommon{Lineno: 1},
 						},
 					},
 					StmtCommon: nodes.StmtCommon{Lineno: 1},

@@ -20,8 +20,10 @@ func (n *NodeCommon) GetLineno() int {
 	return n.Lineno
 }
 
-type ExprCommon struct {
-	NodeCommon
+type ExprCommon NodeCommon
+
+func (e *ExprCommon) GetLineno() int {
+	return e.Lineno
 }
 
 type StmtCommon NodeCommon
