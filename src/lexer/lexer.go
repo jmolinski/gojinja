@@ -3,7 +3,7 @@ package lexer
 import (
 	"fmt"
 	"github.com/gojinja/gojinja/src/errors"
-	"github.com/gojinja/gojinja/src/utils"
+	"github.com/gojinja/gojinja/src/utils/identifier"
 	"github.com/gojinja/gojinja/src/utils/stack"
 	"github.com/hashicorp/golang-lru"
 	"regexp"
@@ -82,7 +82,7 @@ func New(env *EnvLexerInformation) *Lexer {
 		{whitespaceRe, TokenWhitespace, nil},
 		{floatRe, TokenFloat, nil},
 		{integerRe, TokenInteger, nil},
-		{utils.NameRe, TokenName, nil},
+		{identifier.NameRe, TokenName, nil},
 		{stringRe, TokenString, nil},
 		{operatorRe, TokenOperator, nil},
 	}
@@ -213,7 +213,7 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 		case "keyword":
 			token = raw.valueStr
 		case TokenName:
-			if !utils.IsIdentifier(raw.valueStr) {
+			if !identifier.IsIdentifier(raw.valueStr) {
 				return nil, errors.TemplateSyntaxError("Invalid character in identifier", raw.lineno, name, filename)
 			}
 		case TokenString:
