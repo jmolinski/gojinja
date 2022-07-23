@@ -19,14 +19,51 @@ type Template struct {
 	NodeCommon
 }
 
-type Stmt interface {
-}
+type Stmt interface{}
 
 type Expr interface {
 }
 
 type Output struct {
 	Nodes []Node
+	NodeCommon
+}
+
+type Extends struct {
+	Template Expr
+	NodeCommon
+}
+
+type MacroCall struct {
+	Args     []Name
+	Defaults []Expr
+}
+
+type Macro struct {
+	Name string
+	Body []Node
+	MacroCall
+	NodeCommon
+}
+
+type EvalContextModifier struct {
+	Options []Keyword
+	NodeCommon
+}
+
+type ScopedEvalContextModifier struct {
+	Body []Node
+	EvalContextModifier
+}
+
+type Scope struct {
+	Body []Node
+	NodeCommon
+}
+
+type FilterBlock struct {
+	Body   []Node
+	Filter Node
 	NodeCommon
 }
 
@@ -152,3 +189,8 @@ var _ Node = &Tuple{}
 var _ Node = &Const{}
 var _ Node = &Name{}
 var _ Node = &CondExpr{}
+var _ Node = &Extends{}
+var _ Node = &Macro{}
+
+var _ Node = &Scope{}
+var _ Node = &FilterBlock{}
