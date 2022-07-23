@@ -1175,8 +1175,35 @@ func (p *parser) parseAssignTarget(withTuple bool, nameOnly bool, extraEndRule [
 }
 
 func (p *parser) parseSignature(n *nodes.MacroCall) error {
-	// TODO
-	panic("TODO")
+	n.Args = make([]nodes.Name, 0)
+	n.Defaults = make([]nodes.Expr, 0)
+	if _, err := p.stream.Expect(lexer.TokenLParen); err != nil {
+		return err
+	}
+	for p.stream.Current().Type != lexer.TokenRParen {
+		if len(n.Args) != 0 {
+			if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
+				return err
+			}
+		}
+		arg, err := p.parseAssignTarget(true, true, nil, false)
+		if err != nil {
+			return err
+		}
+		arg.Ctx = "param"
+		if p.stream.SkipIf(lexer.TokenAssign) {
+			expr, err := p.parseExpression(true)
+			if err != nil {
+				return err
+			}
+			n.Defaults = append(n.Defaults, expr)
+		} else if len(n.Defaults) != 0 {
+			return p.fail("non-default argument follows default argument", nil)
+		}
+		n.Args = append(n.Args, arg)
+	}
+	_, err := p.stream.Expect(lexer.TokenRParen)
+	return err
 }
 
 func (p *parser) fail(msg string, lineno *int) error {
