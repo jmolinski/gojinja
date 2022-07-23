@@ -20,6 +20,20 @@ func (n *NodeCommon) GetLineno() int {
 	return n.Lineno
 }
 
+type ExprCommon struct {
+	NodeCommon
+}
+
+type StmtCommon NodeCommon
+
+func (s *StmtCommon) GetLineno() int {
+	return s.Lineno
+}
+
+func (ExprCommon) CanAssign() bool {
+	return false
+}
+
 type Template struct {
 	Body []Node
 	NodeCommon
@@ -31,7 +45,9 @@ func (t *Template) SetCtx(ctx string) {
 	}
 }
 
-type Stmt interface{}
+type Stmt interface {
+	Node
+}
 
 type Expr interface {
 	CanAssign() bool
@@ -39,8 +55,8 @@ type Expr interface {
 }
 
 type Output struct {
-	Nodes []Node
-	NodeCommon
+	Nodes []Expr
+	StmtCommon
 }
 
 func (o *Output) SetCtx(ctx string) {
@@ -51,7 +67,7 @@ func (o *Output) SetCtx(ctx string) {
 
 type Extends struct {
 	Template Expr
-	NodeCommon
+	StmtCommon
 }
 
 func (e *Extends) SetCtx(ctx string) {
@@ -67,7 +83,7 @@ type Macro struct {
 	Name string
 	Body []Node
 	MacroCall
-	NodeCommon
+	StmtCommon
 }
 
 func (m *Macro) SetCtx(ctx string) {
@@ -84,7 +100,7 @@ func (m *Macro) SetCtx(ctx string) {
 
 type EvalContextModifier struct {
 	Options []Keyword
-	NodeCommon
+	StmtCommon
 }
 
 func (e *EvalContextModifier) SetCtx(ctx string) {
@@ -106,7 +122,7 @@ func (s *ScopedEvalContextModifier) SetCtx(ctx string) {
 
 type Scope struct {
 	Body []Node
-	NodeCommon
+	StmtCommon
 }
 
 func (s *Scope) SetCtx(ctx string) {
@@ -117,8 +133,8 @@ func (s *Scope) SetCtx(ctx string) {
 
 type FilterBlock struct {
 	Body   []Node
-	Filter Node
-	NodeCommon
+	Filter Filter
+	StmtCommon
 }
 
 func (f *FilterBlock) SetCtx(ctx string) {
@@ -128,18 +144,29 @@ func (f *FilterBlock) SetCtx(ctx string) {
 	f.Filter.SetCtx(ctx)
 }
 
+type Literal Expr
+type LiteralCommon ExprCommon
+
+func (l LiteralCommon) GetLineno() int {
+	return l.Lineno
+}
+
+func (LiteralCommon) CanAssign() bool {
+	return false
+}
+
 // TemplateData represents a constant template string.
 type TemplateData struct {
 	Data string
-	NodeCommon
+	LiteralCommon
 }
 
 func (t *TemplateData) SetCtx(string) {}
 
 type Tuple struct {
-	Items []Node
+	Items []Expr
 	Ctx   string
-	NodeCommon
+	LiteralCommon
 }
 
 func (t *Tuple) SetCtx(ctx string) {
@@ -151,7 +178,7 @@ func (t *Tuple) SetCtx(ctx string) {
 
 type Const struct {
 	Value any
-	NodeCommon
+	LiteralCommon
 }
 
 func (c *Const) SetCtx(string) {}
@@ -159,7 +186,7 @@ func (c *Const) SetCtx(string) {}
 type Name struct {
 	Name string
 	Ctx  string
-	NodeCommon
+	ExprCommon
 }
 
 func (n *Name) SetCtx(ctx string) {
@@ -177,7 +204,7 @@ func (n Name) GetName() string {
 type NSRef struct {
 	Name string
 	Attr string
-	NodeCommon
+	ExprCommon
 }
 
 func (n NSRef) SetCtx(string) {}
@@ -191,22 +218,31 @@ func (n NSRef) GetName() string {
 }
 
 type CondExpr struct {
-	Test  Node
-	Expr1 Node
-	Expr2 Node
-	NodeCommon
+	Test  Expr
+	Expr1 Expr
+	Expr2 *Expr
+	ExprCommon
 }
 
 func (c *CondExpr) SetCtx(ctx string) {
 	c.Test.SetCtx(ctx)
 	c.Expr1.SetCtx(ctx)
-	c.Expr2.SetCtx(ctx)
+	if c.Expr2 != nil {
+		(*c.Expr2).SetCtx(ctx)
+	}
+}
+
+type Helper Node
+type HelperCommon NodeCommon
+
+func (h HelperCommon) GetLineno() int {
+	return h.Lineno
 }
 
 type Operand struct {
 	Op   string
 	Expr Node
-	NodeCommon
+	HelperCommon
 }
 
 func (o *Operand) SetCtx(ctx string) {
@@ -214,9 +250,9 @@ func (o *Operand) SetCtx(ctx string) {
 }
 
 type Compare struct {
-	Expr Node
+	Expr Expr
 	Ops  []Operand
-	NodeCommon
+	ExprCommon
 }
 
 func (c *Compare) SetCtx(ctx string) {
@@ -226,21 +262,21 @@ func (c *Compare) SetCtx(ctx string) {
 	}
 }
 
-type BinOp struct {
-	Left  Node
-	Right Node
+type BinExpr struct {
+	Left  Expr
+	Right Expr
 	Op    string // same as lexer.TokenAdd etc. + "and", "or"
-	NodeCommon
+	ExprCommon
 }
 
-func (b *BinOp) SetCtx(ctx string) {
+func (b *BinExpr) SetCtx(ctx string) {
 	b.Left.SetCtx(ctx)
 	b.Right.SetCtx(ctx)
 }
 
 type Concat struct {
-	Nodes []Node
-	NodeCommon
+	Nodes []Expr
+	ExprCommon
 }
 
 func (c *Concat) SetCtx(ctx string) {
@@ -249,21 +285,21 @@ func (c *Concat) SetCtx(ctx string) {
 	}
 }
 
-type UnaryOp struct {
-	Node Node
+type UnaryExpr struct {
+	Node Expr
 	Op   string // same as lexer.TokenAdd etc. + "not"
-	NodeCommon
+	ExprCommon
 }
 
-func (u *UnaryOp) SetCtx(ctx string) {
+func (u *UnaryExpr) SetCtx(ctx string) {
 	u.Node.SetCtx(ctx)
 }
 
 type Getattr struct {
-	Node Node
+	Node Expr
 	Attr string
 	Ctx  string
-	NodeCommon
+	ExprCommon
 }
 
 func (g *Getattr) SetCtx(ctx string) {
@@ -271,10 +307,10 @@ func (g *Getattr) SetCtx(ctx string) {
 }
 
 type Getitem struct {
-	Node Node
-	Arg  Node
+	Node Expr
+	Arg  Expr
 	Ctx  string
-	NodeCommon
+	ExprCommon
 }
 
 func (g *Getitem) SetCtx(ctx string) {
@@ -282,10 +318,10 @@ func (g *Getitem) SetCtx(ctx string) {
 }
 
 type Slice struct {
-	Start *Node
-	Stop  *Node
-	Step  *Node
-	NodeCommon
+	Start *Expr
+	Stop  *Expr
+	Step  *Expr
+	ExprCommon
 }
 
 func (s *Slice) SetCtx(ctx string) {
@@ -301,12 +337,12 @@ func (s *Slice) SetCtx(ctx string) {
 }
 
 type Call struct {
-	Node      Node
-	Args      []Node
-	Kwargs    []Node
-	DynArgs   *Node
-	DynKwargs *Node
-	NodeCommon
+	Node      Expr
+	Args      []Expr
+	Kwargs    []Keyword
+	DynArgs   *Expr
+	DynKwargs *Expr
+	ExprCommon
 }
 
 func (c *Call) SetCtx(ctx string) {
@@ -325,18 +361,24 @@ func (c *Call) SetCtx(ctx string) {
 	}
 }
 
-type Filter struct {
-	Node      Node
+type FilterTestCommon struct {
+	Node      *Node
 	Name      string
 	Args      []Node
 	Kwargs    []Node
 	DynArgs   *Node
 	DynKwargs *Node
-	NodeCommon
+	ExprCommon
+}
+
+type Filter struct {
+	FilterTestCommon
 }
 
 func (f *Filter) SetCtx(ctx string) {
-	f.Node.SetCtx(ctx)
+	if f.Node != nil {
+		(*f.Node).SetCtx(ctx)
+	}
 	for _, n := range f.Args {
 		n.SetCtx(ctx)
 	}
@@ -353,8 +395,8 @@ func (f *Filter) SetCtx(ctx string) {
 
 type Keyword struct {
 	Key   string
-	Value Node
-	NodeCommon
+	Value Expr
+	HelperCommon
 }
 
 func (k *Keyword) SetCtx(ctx string) {
@@ -366,7 +408,7 @@ type If struct {
 	Body []Node
 	Elif []If
 	Else []Node
-	NodeCommon
+	StmtCommon
 }
 
 func (i *If) SetCtx(ctx string) {
@@ -384,32 +426,36 @@ func (i *If) SetCtx(ctx string) {
 
 // Assert all types of nodes implement Node interface.
 var _ Node = &Template{}
+
+var _ Stmt = &Extends{}
+var _ Stmt = &Macro{}
+var _ Stmt = &Scope{}
+var _ Stmt = &FilterBlock{}
 var _ Stmt = &Output{}
-var _ Node = &TemplateData{}
-var _ Node = &Tuple{}
-var _ Node = &Const{}
-var _ Node = &Name{}
-var _ Node = &NSRef{}
-var _ Node = &CondExpr{}
-var _ Node = &Extends{}
-var _ Node = &Macro{}
-var _ Node = &Scope{}
-var _ Node = &FilterBlock{}
-var _ Node = &Keyword{}
-var _ Node = &BinOp{}
-var _ Node = &UnaryOp{}
-var _ Node = &Output{}
-var _ Node = &Compare{}
-var _ Node = &Concat{}
-var _ Node = &Operand{}
-var _ Node = &Getattr{}
-var _ Node = &Getitem{}
-var _ Node = &Slice{}
-var _ Node = &Call{}
-var _ Node = &Filter{}
-var _ Node = &If{}
-var _ Node = &ScopedEvalContextModifier{}
-var _ Node = &EvalContextModifier{}
+var _ Stmt = &If{}
+var _ Stmt = &ScopedEvalContextModifier{}
+var _ Stmt = &EvalContextModifier{}
+var _ Stmt = &Output{}
+
+var _ Expr = &BinExpr{}
+var _ Expr = &UnaryExpr{}
+var _ Expr = &CondExpr{}
+var _ Expr = &Compare{}
+var _ Expr = &Concat{}
+var _ Expr = &Call{}
+var _ Expr = &Filter{}
+var _ Expr = &Name{}
+var _ Expr = &NSRef{}
+var _ Expr = &Getattr{}
+var _ Expr = &Getitem{}
+var _ Expr = &Slice{}
+
+var _ Literal = &Const{}
+var _ Literal = &Tuple{}
+var _ Literal = &TemplateData{}
 
 var _ ExprWithName = &Name{}
 var _ ExprWithName = &NSRef{}
+
+var _ Helper = &Keyword{}
+var _ Helper = &Operand{}
