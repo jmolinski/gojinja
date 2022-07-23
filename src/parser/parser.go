@@ -643,7 +643,7 @@ func (p *parser) parseSubscript(node nodes.Expr) (nodes.Expr, error) {
 			arg = &nodes.Tuple{
 				Items:         args,
 				Ctx:           "load",
-				LiteralCommon: nodes.LiteralCommon{nodes.NodeCommon{Lineno: token.Lineno}},
+				LiteralCommon: nodes.LiteralCommon{NodeCommon: nodes.NodeCommon{Lineno: token.Lineno}},
 			}
 		}
 
