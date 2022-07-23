@@ -1145,8 +1145,41 @@ func (p *parser) parseImport() (nodes.Node, error) {
 }
 
 func (p *parser) parseSet() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	lineno := p.stream.Next().Lineno
+	target, err := p.parseAssignTargetNameNamespace()
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.SkipIf(lexer.TokenAssign) {
+		expr, err := p.parseTuple(false, true, nil, false)
+		if err != nil {
+			return nil, err
+		}
+		return &nodes.Assign{
+			Target:     target,
+			Node:       expr,
+			StmtCommon: nodes.StmtCommon{Lineno: lineno},
+		}, nil
+	}
+	filter, err := p.parseFilter(nil, false)
+	if err != nil {
+		return nil, err
+	}
+	if f, ok := (*filter).(*nodes.Filter); ok {
+		body, err := p.parseStatements([]string{"name:endset"}, true)
+		if err != nil {
+			return nil, err
+		}
+		return &nodes.AssignBlock{
+			Target: target,
+			Body:   body,
+			Filter: f,
+			StmtCommon: nodes.StmtCommon{
+				Lineno: lineno,
+			},
+		}, nil
+	}
+	return nil, fmt.Errorf("couldn't parse filter")
 }
 
 func (p *parser) parseWith() (nodes.Node, error) {

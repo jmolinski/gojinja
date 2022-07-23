@@ -383,6 +383,34 @@ func (i *Include) SetCtx(ctx string) {
 	i.Template.SetCtx(ctx)
 }
 
+type Assign struct {
+	Target Expr
+	Node   Node
+	StmtCommon
+}
+
+func (a *Assign) SetCtx(ctx string) {
+	a.Target.SetCtx(ctx)
+	a.Node.SetCtx(ctx)
+}
+
+type AssignBlock struct {
+	Target Expr
+	Body   []Node
+	Filter *Filter
+	StmtCommon
+}
+
+func (a *AssignBlock) SetCtx(ctx string) {
+	a.Target.SetCtx(ctx)
+	for _, n := range a.Body {
+		n.SetCtx(ctx)
+	}
+	if a.Filter != nil {
+		(*a.Filter).SetCtx(ctx)
+	}
+}
+
 type Import struct {
 	Template    Expr
 	WithContext bool
@@ -496,6 +524,8 @@ var _ Stmt = &Output{}
 var _ Stmt = &CallBlock{}
 var _ Stmt = &Include{}
 var _ Stmt = &Import{}
+var _ Stmt = &Assign{}
+var _ Stmt = &AssignBlock{}
 
 var _ StmtWithWithContext = &Include{}
 var _ StmtWithWithContext = &Import{}
