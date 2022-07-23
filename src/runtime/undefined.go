@@ -33,7 +33,6 @@ func (Undefined) Undefined() {}
 
 type IUndefined interface {
 	Undefined()
-	AddLogger(*log.Logger)
 }
 
 func NewUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) Undefined {
