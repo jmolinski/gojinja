@@ -5,7 +5,6 @@ import (
 	"github.com/gojinja/gojinja/src/errors"
 	"github.com/gojinja/gojinja/src/utils"
 	"log"
-	"os"
 	"reflect"
 	"strconv"
 )
@@ -37,30 +36,23 @@ type IUndefined interface {
 	AddLogger(*log.Logger)
 }
 
-func NewUndefined(hint *string, obj any, name *string, exc func(msg string) error) Undefined {
+func NewUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) Undefined {
 	if exc == nil {
 		exc = errors.TemplateError
 	}
-	return Undefined{hint, obj, name, exc, nil}
+	return Undefined{hint, obj, name, exc, logger}
 }
 
-func NewStrictUndefined(hint *string, obj any, name *string, exc func(msg string) error) StrictUndefined {
-	return StrictUndefined{NewUndefined(hint, obj, name, exc)}
+func NewStrictUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) StrictUndefined {
+	return StrictUndefined{NewUndefined(hint, obj, name, exc, logger)}
 }
 
-func NewChainableUndefined(hint *string, obj any, name *string, exc func(msg string) error) ChainableUndefined {
-	return ChainableUndefined{NewUndefined(hint, obj, name, exc)}
+func NewChainableUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) ChainableUndefined {
+	return ChainableUndefined{NewUndefined(hint, obj, name, exc, logger)}
 }
 
-func NewDebugUndefined(hint *string, obj any, name *string, exc func(msg string) error) StrictUndefined {
-	return StrictUndefined{NewUndefined(hint, obj, name, exc)}
-}
-
-func (u Undefined) AddLogger(logger *log.Logger) {
-	if logger == nil {
-		logger = log.New(os.Stderr, "Undefined logger: ", 0)
-	}
-	u.logger = logger
+func NewDebugUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) StrictUndefined {
+	return StrictUndefined{NewUndefined(hint, obj, name, exc, logger)}
 }
 
 func (u Undefined) undefinedMessage() string {
