@@ -216,7 +216,7 @@ func testIterable(_ *Environment, value any, _ ...any) (bool, error) {
 }
 
 type Escaped interface {
-	HTML()
+	HTML() (string, error)
 }
 
 func testEscaped(_ *Environment, value any, _ ...any) (bool, error) {
@@ -273,5 +273,7 @@ var Default = map[string]Test{
 	"iterable":    testIterable,
 	"in":          testIn,
 	"callable":    testCallable,
+	"sameas":      testSameAs,
+	"escaped":     testEscaped,
 	// TODO operators
 }
