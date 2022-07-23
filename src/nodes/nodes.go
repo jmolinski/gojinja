@@ -528,6 +528,30 @@ func (c *CallBlock) SetCtx(ctx string) {
 	}
 }
 
+type For struct {
+	Target    Node
+	Iter      Node
+	Body      []Node
+	Else      []Node
+	Test      *Node
+	Recursive bool
+	StmtCommon
+}
+
+func (f *For) SetCtx(ctx string) {
+	f.Target.SetCtx(ctx)
+	f.Iter.SetCtx(ctx)
+	for _, n := range f.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range f.Else {
+		n.SetCtx(ctx)
+	}
+	if f.Test != nil {
+		(*f.Test).SetCtx(ctx)
+	}
+}
+
 // Assert all types of nodes implement Node interface.
 var _ Node = &Template{}
 
@@ -546,6 +570,7 @@ var _ Stmt = &Import{}
 var _ Stmt = &Assign{}
 var _ Stmt = &AssignBlock{}
 var _ Stmt = &With{}
+var _ Stmt = &For{}
 
 var _ StmtWithWithContext = &Include{}
 var _ StmtWithWithContext = &Import{}

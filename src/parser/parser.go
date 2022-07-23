@@ -971,8 +971,42 @@ func (p *parser) parseStatement() ([]nodes.Node, error) {
 }
 
 func (p *parser) parseFor() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	forToken, err := p.stream.Expect("name:for")
+	if err != nil {
+		return nil, err
+	}
+	node := &nodes.For{StmtCommon: nodes.StmtCommon{Lineno: forToken.Lineno}}
+	node.Target, err = p.parseAssignTargetTuple([]string{"name:in"})
+	if err != nil {
+		return nil, err
+	}
+	if _, err = p.stream.Expect("name:in"); err != nil {
+		return nil, err
+	}
+	node.Iter, err = p.parseTuple(false, false, []string{"name:recursive"}, false)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.SkipIf("name:if") {
+		var test nodes.Node
+		test, err = p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		node.Test = &test
+	}
+	node.Recursive = p.stream.SkipIf("name:recursive")
+	node.Body, err = p.parseStatements([]string{"name:endfor", "name:else"}, false)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.Next().Value != "endfor" {
+		node.Else, err = p.parseStatements([]string{"name:endfor"}, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return node, nil
 }
 
 func (p *parser) parseIf() (nodes.Node, error) {
@@ -1195,7 +1229,7 @@ func (p *parser) parseWith() (nodes.Node, error) {
 				return nil, err
 			}
 		}
-		target, err := p.parseAssignTargetName()
+		target, err := p.parseAssignTargetTuple(nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1314,8 +1348,8 @@ func (p *parser) parseAssignTargetName() (target *nodes.Name, err error) {
 	return
 }
 
-func (p *parser) parseAssignTargetTuple() (target nodes.Expr, err error) {
-	target, err = p.parseTuple(true, true, nil, false)
+func (p *parser) parseAssignTargetTuple(extraEndRules []string) (target nodes.Expr, err error) {
+	target, err = p.parseTuple(true, true, extraEndRules, false)
 	target.SetCtx("store")
 
 	if !target.CanAssign() {
