@@ -217,18 +217,7 @@ func (l *Lexer) Wrap(stream []tokenRaw, name *string, filename *string) ([]Token
 				return nil, errors.TemplateSyntaxError("Invalid character in identifier", raw.lineno, name, filename)
 			}
 		case TokenString:
-			// TODO improve when we have encoding logic
-			//# try to unescape string
-			//try:
-			//	value = (
-			//		self._normalize_newlines(value_str[1:-1])
-			//	.encode("ascii", "backslashreplace")
-			//	.decode("unicode-escape")
-			//	)
-			//except Exception as e:
-			//	msg = str(e).split(":")[-1].strip()
-			//	raise TemplateSyntaxError(msg, lineno, name, filename) from e
-			value = l.normalizeNewlines(raw.valueStr[1 : len(raw.valueStr)-1])
+			value = unescapeString(l.normalizeNewlines(raw.valueStr[1 : len(raw.valueStr)-1]))
 		case TokenInteger:
 			v, err := strconv.ParseInt(strings.Replace(raw.valueStr, "_", "", -1), 0, 64)
 			if err != nil {
@@ -484,6 +473,36 @@ func fullmatch(re *regexp.Regexp, text string) bool {
 		}
 	}
 	return false
+}
+
+func unescapeString(s string) string {
+	backslashBefore := false
+	var builder strings.Builder
+	for _, c := range s {
+		if c == '\\' {
+			if backslashBefore {
+				builder.WriteString("\\\\")
+				backslashBefore = false
+			} else {
+				backslashBefore = true
+			}
+			continue
+		}
+
+		if c == '"' || c == '\'' {
+			backslashBefore = false
+		}
+
+		if backslashBefore {
+			builder.WriteRune('\\')
+			backslashBefore = false
+		}
+		builder.WriteRune(c)
+	}
+	if backslashBefore {
+		builder.WriteRune('\\')
+	}
+	return builder.String()
 }
 
 func c(x string) *regexp.Regexp {
