@@ -12,6 +12,11 @@ type ExprWithName interface {
 	Expr
 }
 
+type StmtWithWithContext interface {
+	SetWithContext(bool)
+	Stmt
+}
+
 type NodeCommon struct {
 	Lineno int
 }
@@ -363,6 +368,36 @@ func (c *Call) SetCtx(ctx string) {
 	}
 }
 
+type Include struct {
+	Template      Expr
+	WithContext   bool
+	IgnoreMissing bool
+	StmtCommon
+}
+
+func (i *Include) SetWithContext(b bool) {
+	i.WithContext = b
+}
+
+func (i *Include) SetCtx(ctx string) {
+	i.Template.SetCtx(ctx)
+}
+
+type Import struct {
+	Template    Expr
+	WithContext bool
+	Target      string
+	StmtCommon
+}
+
+func (i *Import) SetWithContext(b bool) {
+	i.WithContext = b
+}
+
+func (i *Import) SetCtx(ctx string) {
+	i.Template.SetCtx(ctx)
+}
+
 type FilterTestCommon struct {
 	Node      *Expr
 	Name      string
@@ -426,6 +461,26 @@ func (i *If) SetCtx(ctx string) {
 	}
 }
 
+type CallBlock struct {
+	Call Call
+	Body []Node
+	MacroCall
+	StmtCommon
+}
+
+func (c *CallBlock) SetCtx(ctx string) {
+	c.Call.SetCtx(ctx)
+	for _, n := range c.Args {
+		n.SetCtx(ctx)
+	}
+	for _, n := range c.Defaults {
+		n.SetCtx(ctx)
+	}
+	for _, n := range c.Body {
+		n.SetCtx(ctx)
+	}
+}
+
 // Assert all types of nodes implement Node interface.
 var _ Node = &Template{}
 
@@ -438,6 +493,12 @@ var _ Stmt = &If{}
 var _ Stmt = &ScopedEvalContextModifier{}
 var _ Stmt = &EvalContextModifier{}
 var _ Stmt = &Output{}
+var _ Stmt = &CallBlock{}
+var _ Stmt = &Include{}
+var _ Stmt = &Import{}
+
+var _ StmtWithWithContext = &Include{}
+var _ StmtWithWithContext = &Import{}
 
 var _ Expr = &BinExpr{}
 var _ Expr = &UnaryExpr{}
@@ -452,12 +513,12 @@ var _ Expr = &Getattr{}
 var _ Expr = &Getitem{}
 var _ Expr = &Slice{}
 
+var _ ExprWithName = &Name{}
+var _ ExprWithName = &NSRef{}
+
 var _ Literal = &Const{}
 var _ Literal = &Tuple{}
 var _ Literal = &TemplateData{}
-
-var _ ExprWithName = &Name{}
-var _ ExprWithName = &NSRef{}
 
 var _ Helper = &Keyword{}
 var _ Helper = &Operand{}

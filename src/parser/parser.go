@@ -947,21 +947,15 @@ func (p *parser) parseStatement() ([]nodes.Node, error) {
 			case "autoescape":
 				return wrapInSlice(p.parseAutoescape)
 			default:
-				panic("unexpected statement keyword " + tokenValue)
+				return nil, fmt.Errorf("unexpected statement keyword '%s'", tokenValue)
 			}
 		}
 	}
 
 	if token.Value == "call" {
-		return p.parseCallBlock()
+		return wrapInSlice(p.parseCallBlock)
 	} else if token.Value == "filter" {
-		b, err := p.parseFilterBlock()
-		if err != nil {
-			return nil, err
-		}
-		ret := make([]nodes.Node, 1)
-		ret[0] = b
-		return ret, nil
+		return wrapInSlice(p.parseFilterBlock)
 	} else if tokenValue, ok := token.Value.(string); ok {
 		if ext, ok := p.extensions[tokenValue]; ok {
 			return ext(p)
@@ -1101,9 +1095,29 @@ func (p *parser) parseMacro() (nodes.Node, error) {
 	return n, nil
 }
 
+func (p *parser) parseImportContext(node nodes.StmtWithWithContext, def bool) (nodes.Node, error) {
+	if p.stream.Current().TestAny("name:with", "name:without") &&
+		p.stream.Look().Test("name:context") {
+		node.SetWithContext(p.stream.Next().Value == "with")
+		p.stream.Skip(1)
+	} else {
+		node.SetWithContext(def)
+	}
+	return node, nil
+}
+
 func (p *parser) parseInclude() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Include{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	var err error
+	node.Template, err = p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.Current().Test("name:ignore") && p.stream.Look().Test("name:missing") {
+		node.IgnoreMissing = true
+		p.stream.Skip(2)
+	}
+	return p.parseImportContext(node, true)
 }
 
 func (p *parser) parseFrom() (nodes.Node, error) {
@@ -1112,8 +1126,22 @@ func (p *parser) parseFrom() (nodes.Node, error) {
 }
 
 func (p *parser) parseImport() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Import{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	var err error
+	node.Template, err = p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = p.stream.Expect("name:as"); err != nil {
+		return nil, err
+	}
+	tar, err := p.parseAssignTargetName()
+	if err != nil {
+		return nil, err
+	}
+	node.Target = tar.Name
+
+	return p.parseImportContext(node, false)
 }
 
 func (p *parser) parseSet() (nodes.Node, error) {
@@ -1151,9 +1179,29 @@ func (p *parser) parseAutoescape() (nodes.Node, error) {
 	}, nil
 }
 
-func (p *parser) parseCallBlock() ([]nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+func (p *parser) parseCallBlock() (nodes.Node, error) {
+	node := &nodes.CallBlock{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	if p.stream.Current().Type == lexer.TokenLParen {
+		if err := p.parseSignature(&node.MacroCall); err != nil {
+			return nil, err
+		}
+	}
+
+	callNode, err := p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if call, ok := callNode.(*nodes.Call); ok {
+		node.Call = *call
+	} else {
+		return nil, p.fail("expected call", &node.Lineno)
+	}
+	node.Body, err = p.parseStatements([]string{"name:endcall"}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }
 
 func (p *parser) parseFilterBlock() (nodes.Node, error) {
