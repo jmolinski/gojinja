@@ -1183,8 +1183,40 @@ func (p *parser) parseSet() (nodes.Node, error) {
 }
 
 func (p *parser) parseWith() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.With{
+		Targets:    make([]nodes.Expr, 0),
+		Values:     make([]nodes.Expr, 0),
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+	}
+
+	for p.stream.Current().Type != lexer.TokenBlockEnd {
+		if len(node.Targets) != 0 {
+			if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
+				return nil, err
+			}
+		}
+		target, err := p.parseAssignTargetName()
+		if err != nil {
+			return nil, err
+		}
+		target.SetCtx("param")
+		node.Targets = append(node.Targets, target)
+		if _, err := p.stream.Expect(lexer.TokenAssign); err != nil {
+			return nil, err
+		}
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		node.Values = append(node.Values, expr)
+	}
+
+	var err error
+	node.Body, err = p.parseStatements([]string{"name:endwith"}, true)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (p *parser) parseAutoescape() (nodes.Node, error) {
@@ -1273,6 +1305,22 @@ func (p *parser) parseAssignTargetName() (target *nodes.Name, err error) {
 		Name:       fmt.Sprint(token.Value),
 		Ctx:        "store",
 		ExprCommon: nodes.ExprCommon{Lineno: token.Lineno},
+	}
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
+	}
+
+	return
+}
+
+func (p *parser) parseAssignTargetTuple() (target nodes.Expr, err error) {
+	target, err = p.parseTuple(true, true, nil, false)
+	target.SetCtx("store")
+
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
 	}
 
 	return

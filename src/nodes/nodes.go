@@ -411,6 +411,25 @@ func (a *AssignBlock) SetCtx(ctx string) {
 	}
 }
 
+type With struct {
+	Targets []Expr
+	Values  []Expr
+	Body    []Node
+	StmtCommon
+}
+
+func (w *With) SetCtx(ctx string) {
+	for _, n := range w.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range w.Targets {
+		n.SetCtx(ctx)
+	}
+	for _, n := range w.Values {
+		n.SetCtx(ctx)
+	}
+}
+
 type Import struct {
 	Template    Expr
 	WithContext bool
@@ -526,6 +545,7 @@ var _ Stmt = &Include{}
 var _ Stmt = &Import{}
 var _ Stmt = &Assign{}
 var _ Stmt = &AssignBlock{}
+var _ Stmt = &With{}
 
 var _ StmtWithWithContext = &Include{}
 var _ StmtWithWithContext = &Import{}
