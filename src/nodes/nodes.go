@@ -1,7 +1,15 @@
 package nodes
 
+import "github.com/gojinja/gojinja/src/utils/slices"
+
 type Node interface {
 	GetLineno() int
+	SetCtx(ctx string)
+}
+
+type ExprWithName interface {
+	GetName() string
+	Expr
 }
 
 type NodeCommon struct {
@@ -12,128 +20,389 @@ func (n *NodeCommon) GetLineno() int {
 	return n.Lineno
 }
 
-var _ Node = &NodeCommon{}
+type ExprCommon NodeCommon
+
+func (e *ExprCommon) GetLineno() int {
+	return e.Lineno
+}
+
+type StmtCommon NodeCommon
+
+func (s *StmtCommon) GetLineno() int {
+	return s.Lineno
+}
+
+func (ExprCommon) CanAssign() bool {
+	return false
+}
 
 type Template struct {
 	Body []Node
 	NodeCommon
 }
 
+func (t *Template) SetCtx(ctx string) {
+	for _, n := range t.Body {
+		n.SetCtx(ctx)
+	}
+}
+
 type Stmt interface {
+	Node
 }
 
 type Expr interface {
+	CanAssign() bool
+	Node
 }
 
 type Output struct {
-	Nodes []Node
-	NodeCommon
+	Nodes []Expr
+	StmtCommon
+}
+
+func (o *Output) SetCtx(ctx string) {
+	for _, n := range o.Nodes {
+		n.SetCtx(ctx)
+	}
+}
+
+type Extends struct {
+	Template Expr
+	StmtCommon
+}
+
+func (e *Extends) SetCtx(ctx string) {
+	e.Template.SetCtx(ctx)
+}
+
+type MacroCall struct {
+	Args     []Name
+	Defaults []Expr
+}
+
+type Macro struct {
+	Name string
+	Body []Node
+	MacroCall
+	StmtCommon
+}
+
+func (m *Macro) SetCtx(ctx string) {
+	for _, n := range m.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range m.Args {
+		n.SetCtx(ctx)
+	}
+	for _, n := range m.Defaults {
+		n.SetCtx(ctx)
+	}
+}
+
+type EvalContextModifier struct {
+	Options []Keyword
+	StmtCommon
+}
+
+func (e *EvalContextModifier) SetCtx(ctx string) {
+	for _, n := range e.Options {
+		n.SetCtx(ctx)
+	}
+}
+
+type ScopedEvalContextModifier struct {
+	Body []Node
+	EvalContextModifier
+}
+
+func (s *ScopedEvalContextModifier) SetCtx(ctx string) {
+	for _, n := range s.Body {
+		n.SetCtx(ctx)
+	}
+}
+
+type Scope struct {
+	Body []Node
+	StmtCommon
+}
+
+func (s *Scope) SetCtx(ctx string) {
+	for _, n := range s.Body {
+		n.SetCtx(ctx)
+	}
+}
+
+type FilterBlock struct {
+	Body   []Node
+	Filter *Filter
+	StmtCommon
+}
+
+func (f *FilterBlock) SetCtx(ctx string) {
+	for _, n := range f.Body {
+		n.SetCtx(ctx)
+	}
+	f.Filter.SetCtx(ctx)
+}
+
+type Literal Expr
+type LiteralCommon ExprCommon
+
+func (l LiteralCommon) GetLineno() int {
+	return l.Lineno
+}
+
+func (LiteralCommon) CanAssign() bool {
+	return false
 }
 
 // TemplateData represents a constant template string.
 type TemplateData struct {
 	Data string
-	NodeCommon
+	LiteralCommon
 }
 
+func (t *TemplateData) SetCtx(string) {}
+
 type Tuple struct {
-	Items []Node
+	Items []Expr
 	Ctx   string
-	NodeCommon
+	LiteralCommon
+}
+
+func (t *Tuple) SetCtx(ctx string) {
+	for _, n := range t.Items {
+		n.SetCtx(ctx)
+	}
+	t.Ctx = ctx
 }
 
 type Const struct {
 	Value any
-	NodeCommon
+	LiteralCommon
 }
+
+func (c *Const) SetCtx(string) {}
 
 type Name struct {
 	Name string
 	Ctx  string
-	NodeCommon
+	ExprCommon
+}
+
+func (n *Name) SetCtx(ctx string) {
+	n.Ctx = ctx
+}
+
+func (n Name) CanAssign() bool {
+	return !slices.Contains([]string{"true", "false", "none", "True", "False", "None"}, n.Name)
+}
+
+func (n Name) GetName() string {
+	return n.Name
+}
+
+type NSRef struct {
+	Name string
+	Attr string
+	ExprCommon
+}
+
+func (n NSRef) SetCtx(string) {}
+
+func (n NSRef) CanAssign() bool {
+	return true
+}
+
+func (n NSRef) GetName() string {
+	return n.Name
 }
 
 type CondExpr struct {
-	Test  Node
-	Expr1 Node
-	Expr2 Node
-	NodeCommon
+	Test  Expr
+	Expr1 Expr
+	Expr2 *Expr
+	ExprCommon
+}
+
+func (c *CondExpr) SetCtx(ctx string) {
+	c.Test.SetCtx(ctx)
+	c.Expr1.SetCtx(ctx)
+	if c.Expr2 != nil {
+		(*c.Expr2).SetCtx(ctx)
+	}
+}
+
+type Helper Node
+type HelperCommon NodeCommon
+
+func (h HelperCommon) GetLineno() int {
+	return h.Lineno
 }
 
 type Operand struct {
 	Op   string
 	Expr Node
-	NodeCommon
+	HelperCommon
+}
+
+func (o *Operand) SetCtx(ctx string) {
+	o.Expr.SetCtx(ctx)
 }
 
 type Compare struct {
-	Expr Node
+	Expr Expr
 	Ops  []Operand
-	NodeCommon
+	ExprCommon
 }
 
-type BinOp struct {
-	Left  Node
-	Right Node
+func (c *Compare) SetCtx(ctx string) {
+	c.Expr.SetCtx(ctx)
+	for _, n := range c.Ops {
+		n.SetCtx(ctx)
+	}
+}
+
+type BinExpr struct {
+	Left  Expr
+	Right Expr
 	Op    string // same as lexer.TokenAdd etc. + "and", "or"
-	NodeCommon
+	ExprCommon
+}
+
+func (b *BinExpr) SetCtx(ctx string) {
+	b.Left.SetCtx(ctx)
+	b.Right.SetCtx(ctx)
 }
 
 type Concat struct {
-	Nodes []Node
-	NodeCommon
+	Nodes []Expr
+	ExprCommon
 }
 
-type UnaryOp struct {
-	Node Node
+func (c *Concat) SetCtx(ctx string) {
+	for _, n := range c.Nodes {
+		n.SetCtx(ctx)
+	}
+}
+
+type UnaryExpr struct {
+	Node Expr
 	Op   string // same as lexer.TokenAdd etc. + "not"
-	NodeCommon
+	ExprCommon
+}
+
+func (u *UnaryExpr) SetCtx(ctx string) {
+	u.Node.SetCtx(ctx)
 }
 
 type Getattr struct {
-	Node Node
+	Node Expr
 	Attr string
 	Ctx  string
-	NodeCommon
+	ExprCommon
+}
+
+func (g *Getattr) SetCtx(ctx string) {
+	g.Node.SetCtx(ctx)
 }
 
 type Getitem struct {
-	Node Node
-	Arg  Node
+	Node Expr
+	Arg  Expr
 	Ctx  string
-	NodeCommon
+	ExprCommon
+}
+
+func (g *Getitem) SetCtx(ctx string) {
+	g.Node.SetCtx(ctx)
 }
 
 type Slice struct {
-	Start *Node
-	Stop  *Node
-	Step  *Node
-	NodeCommon
+	Start *Expr
+	Stop  *Expr
+	Step  *Expr
+	ExprCommon
+}
+
+func (s *Slice) SetCtx(ctx string) {
+	if s.Start != nil {
+		(*s.Start).SetCtx(ctx)
+	}
+	if s.Stop != nil {
+		(*s.Stop).SetCtx(ctx)
+	}
+	if s.Step != nil {
+		(*s.Step).SetCtx(ctx)
+	}
 }
 
 type Call struct {
-	Node      Node
-	Args      []Node
-	Kwargs    []Node
-	DynArgs   *Node
-	DynKwargs *Node
-	NodeCommon
+	Node      Expr
+	Args      []Expr
+	Kwargs    []Keyword
+	DynArgs   *Expr
+	DynKwargs *Expr
+	ExprCommon
+}
+
+func (c *Call) SetCtx(ctx string) {
+	c.Node.SetCtx(ctx)
+	for _, n := range c.Args {
+		n.SetCtx(ctx)
+	}
+	for _, n := range c.Kwargs {
+		n.SetCtx(ctx)
+	}
+	if c.DynArgs != nil {
+		(*c.DynArgs).SetCtx(ctx)
+	}
+	if c.DynKwargs != nil {
+		(*c.DynKwargs).SetCtx(ctx)
+	}
+}
+
+type FilterTestCommon struct {
+	Node      *Expr
+	Name      string
+	Args      []Expr
+	Kwargs    []Keyword // Jinja uses Pair but then other methods returns Keyword instead of Pair -_-
+	DynArgs   *Expr
+	DynKwargs *Expr
+	ExprCommon
 }
 
 type Filter struct {
-	Node      Node
-	Name      string
-	Args      []Node
-	Kwargs    []Node
-	DynArgs   *Node
-	DynKwargs *Node
-	NodeCommon
+	FilterTestCommon
+}
+
+func (f *Filter) SetCtx(ctx string) {
+	if f.Node != nil {
+		(*f.Node).SetCtx(ctx)
+	}
+	for _, n := range f.Args {
+		n.SetCtx(ctx)
+	}
+	for _, n := range f.Kwargs {
+		n.SetCtx(ctx)
+	}
+	if f.DynArgs != nil {
+		(*f.DynArgs).SetCtx(ctx)
+	}
+	if f.DynKwargs != nil {
+		(*f.DynKwargs).SetCtx(ctx)
+	}
 }
 
 type Keyword struct {
 	Key   string
-	Value Node
-	NodeCommon
+	Value Expr
+	HelperCommon
+}
+
+func (k *Keyword) SetCtx(ctx string) {
+	k.Value.SetCtx(ctx)
 }
 
 type If struct {
@@ -141,14 +410,54 @@ type If struct {
 	Body []Node
 	Elif []If
 	Else []Node
-	NodeCommon
+	StmtCommon
+}
+
+func (i *If) SetCtx(ctx string) {
+	i.Test.SetCtx(ctx)
+	for _, n := range i.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range i.Else {
+		n.SetCtx(ctx)
+	}
+	for _, n := range i.Elif {
+		n.SetCtx(ctx)
+	}
 }
 
 // Assert all types of nodes implement Node interface.
 var _ Node = &Template{}
+
+var _ Stmt = &Extends{}
+var _ Stmt = &Macro{}
+var _ Stmt = &Scope{}
+var _ Stmt = &FilterBlock{}
 var _ Stmt = &Output{}
-var _ Node = &TemplateData{}
-var _ Node = &Tuple{}
-var _ Node = &Const{}
-var _ Node = &Name{}
-var _ Node = &CondExpr{}
+var _ Stmt = &If{}
+var _ Stmt = &ScopedEvalContextModifier{}
+var _ Stmt = &EvalContextModifier{}
+var _ Stmt = &Output{}
+
+var _ Expr = &BinExpr{}
+var _ Expr = &UnaryExpr{}
+var _ Expr = &CondExpr{}
+var _ Expr = &Compare{}
+var _ Expr = &Concat{}
+var _ Expr = &Call{}
+var _ Expr = &Filter{}
+var _ Expr = &Name{}
+var _ Expr = &NSRef{}
+var _ Expr = &Getattr{}
+var _ Expr = &Getitem{}
+var _ Expr = &Slice{}
+
+var _ Literal = &Const{}
+var _ Literal = &Tuple{}
+var _ Literal = &TemplateData{}
+
+var _ ExprWithName = &Name{}
+var _ ExprWithName = &NSRef{}
+
+var _ Helper = &Keyword{}
+var _ Helper = &Operand{}
