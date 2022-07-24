@@ -12,6 +12,11 @@ type ExprWithName interface {
 	Expr
 }
 
+type SetWithContexter interface {
+	SetWithContext(bool)
+	Stmt
+}
+
 type NodeCommon struct {
 	Lineno int
 }
@@ -363,6 +368,83 @@ func (c *Call) SetCtx(ctx string) {
 	}
 }
 
+type Include struct {
+	Template      Expr
+	WithContext   bool
+	IgnoreMissing bool
+	StmtCommon
+}
+
+func (i *Include) SetWithContext(b bool) {
+	i.WithContext = b
+}
+
+func (i *Include) SetCtx(ctx string) {
+	i.Template.SetCtx(ctx)
+}
+
+type Assign struct {
+	Target Expr
+	Node   Node
+	StmtCommon
+}
+
+func (a *Assign) SetCtx(ctx string) {
+	a.Target.SetCtx(ctx)
+	a.Node.SetCtx(ctx)
+}
+
+type AssignBlock struct {
+	Target Expr
+	Body   []Node
+	Filter *Filter
+	StmtCommon
+}
+
+func (a *AssignBlock) SetCtx(ctx string) {
+	a.Target.SetCtx(ctx)
+	for _, n := range a.Body {
+		n.SetCtx(ctx)
+	}
+	if a.Filter != nil {
+		(*a.Filter).SetCtx(ctx)
+	}
+}
+
+type With struct {
+	Targets []Expr
+	Values  []Expr
+	Body    []Node
+	StmtCommon
+}
+
+func (w *With) SetCtx(ctx string) {
+	for _, n := range w.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range w.Targets {
+		n.SetCtx(ctx)
+	}
+	for _, n := range w.Values {
+		n.SetCtx(ctx)
+	}
+}
+
+type Import struct {
+	Template    Expr
+	WithContext bool
+	Target      string
+	StmtCommon
+}
+
+func (i *Import) SetWithContext(b bool) {
+	i.WithContext = b
+}
+
+func (i *Import) SetCtx(ctx string) {
+	i.Template.SetCtx(ctx)
+}
+
 type FilterTestCommon struct {
 	Node      *Expr
 	Name      string
@@ -426,6 +508,50 @@ func (i *If) SetCtx(ctx string) {
 	}
 }
 
+type CallBlock struct {
+	Call Call
+	Body []Node
+	MacroCall
+	StmtCommon
+}
+
+func (c *CallBlock) SetCtx(ctx string) {
+	c.Call.SetCtx(ctx)
+	for _, n := range c.Args {
+		n.SetCtx(ctx)
+	}
+	for _, n := range c.Defaults {
+		n.SetCtx(ctx)
+	}
+	for _, n := range c.Body {
+		n.SetCtx(ctx)
+	}
+}
+
+type For struct {
+	Target    Node
+	Iter      Node
+	Body      []Node
+	Else      []Node
+	Test      *Node
+	Recursive bool
+	StmtCommon
+}
+
+func (f *For) SetCtx(ctx string) {
+	f.Target.SetCtx(ctx)
+	f.Iter.SetCtx(ctx)
+	for _, n := range f.Body {
+		n.SetCtx(ctx)
+	}
+	for _, n := range f.Else {
+		n.SetCtx(ctx)
+	}
+	if f.Test != nil {
+		(*f.Test).SetCtx(ctx)
+	}
+}
+
 // Assert all types of nodes implement Node interface.
 var _ Node = &Template{}
 
@@ -438,6 +564,16 @@ var _ Stmt = &If{}
 var _ Stmt = &ScopedEvalContextModifier{}
 var _ Stmt = &EvalContextModifier{}
 var _ Stmt = &Output{}
+var _ Stmt = &CallBlock{}
+var _ Stmt = &Include{}
+var _ Stmt = &Import{}
+var _ Stmt = &Assign{}
+var _ Stmt = &AssignBlock{}
+var _ Stmt = &With{}
+var _ Stmt = &For{}
+
+var _ SetWithContexter = &Include{}
+var _ SetWithContexter = &Import{}
 
 var _ Expr = &BinExpr{}
 var _ Expr = &UnaryExpr{}
@@ -452,12 +588,12 @@ var _ Expr = &Getattr{}
 var _ Expr = &Getitem{}
 var _ Expr = &Slice{}
 
+var _ ExprWithName = &Name{}
+var _ ExprWithName = &NSRef{}
+
 var _ Literal = &Const{}
 var _ Literal = &Tuple{}
 var _ Literal = &TemplateData{}
-
-var _ ExprWithName = &Name{}
-var _ ExprWithName = &NSRef{}
 
 var _ Helper = &Keyword{}
 var _ Helper = &Operand{}

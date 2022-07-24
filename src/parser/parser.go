@@ -9,6 +9,7 @@ import (
 	"github.com/gojinja/gojinja/src/utils/set"
 	"github.com/gojinja/gojinja/src/utils/slices"
 	"github.com/gojinja/gojinja/src/utils/stack"
+	"reflect"
 	"strings"
 )
 
@@ -952,15 +953,9 @@ func (p *parser) parseStatement() ([]nodes.Node, error) {
 	}
 
 	if token.Value == "call" {
-		return p.parseCallBlock()
+		return wrapInSlice(p.parseCallBlock)
 	} else if token.Value == "filter" {
-		b, err := p.parseFilterBlock()
-		if err != nil {
-			return nil, err
-		}
-		ret := make([]nodes.Node, 1)
-		ret[0] = b
-		return ret, nil
+		return wrapInSlice(p.parseFilterBlock)
 	} else if tokenValue, ok := token.Value.(string); ok {
 		if ext, ok := p.extensions[tokenValue]; ok {
 			return ext(p)
@@ -976,8 +971,42 @@ func (p *parser) parseStatement() ([]nodes.Node, error) {
 }
 
 func (p *parser) parseFor() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	forToken, err := p.stream.Expect("name:for")
+	if err != nil {
+		return nil, err
+	}
+	node := &nodes.For{StmtCommon: nodes.StmtCommon{Lineno: forToken.Lineno}}
+	node.Target, err = p.parseAssignTargetTuple([]string{"name:in"})
+	if err != nil {
+		return nil, err
+	}
+	if _, err = p.stream.Expect("name:in"); err != nil {
+		return nil, err
+	}
+	node.Iter, err = p.parseTuple(false, false, []string{"name:recursive"}, false)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.SkipIf("name:if") {
+		var test nodes.Node
+		test, err = p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		node.Test = &test
+	}
+	node.Recursive = p.stream.SkipIf("name:recursive")
+	node.Body, err = p.parseStatements([]string{"name:endfor", "name:else"}, false)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.Next().Value != "endfor" {
+		node.Else, err = p.parseStatements([]string{"name:endfor"}, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return node, nil
 }
 
 func (p *parser) parseIf() (nodes.Node, error) {
@@ -1049,23 +1078,80 @@ func (p *parser) parseBlock() (nodes.Node, error) {
 }
 
 func (p *parser) parseExtends() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Extends{
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+	}
+	var err error
+	node.Template, err = p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (p *parser) parsePrint() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Output{
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+		Nodes:      make([]nodes.Expr, 0),
+	}
+	for p.stream.Current().Type != lexer.TokenBlockEnd {
+		if len(node.Nodes) > 0 {
+			_, err := p.stream.Expect(lexer.TokenComma)
+			if err != nil {
+				return nil, err
+			}
+		}
+		n, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		node.Nodes = append(node.Nodes, n)
+	}
+	return node, nil
 }
 
 func (p *parser) parseMacro() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	n := &nodes.Macro{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+
+	name, err := p.parseAssignTargetName()
+	if err != nil {
+		return nil, err
+	}
+	n.Name = name.GetName()
+	if err = p.parseSignature(&n.MacroCall); err != nil {
+		return nil, err
+	}
+	n.Body, err = p.parseStatements([]string{"name:endmacro"}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
+}
+
+func (p *parser) parseImportContext(node nodes.SetWithContexter, def bool) (nodes.Node, error) {
+	if p.stream.Current().TestAny("name:with", "name:without") &&
+		p.stream.Look().Test("name:context") {
+		node.SetWithContext(p.stream.Next().Value == "with")
+		p.stream.Skip(1)
+	} else {
+		node.SetWithContext(def)
+	}
+	return node, nil
 }
 
 func (p *parser) parseInclude() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Include{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	var err error
+	node.Template, err = p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.Current().Test("name:ignore") && p.stream.Look().Test("name:missing") {
+		node.IgnoreMissing = true
+		p.stream.Skip(2)
+	}
+	return p.parseImportContext(node, true)
 }
 
 func (p *parser) parseFrom() (nodes.Node, error) {
@@ -1074,33 +1160,273 @@ func (p *parser) parseFrom() (nodes.Node, error) {
 }
 
 func (p *parser) parseImport() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.Import{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	var err error
+	node.Template, err = p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = p.stream.Expect("name:as"); err != nil {
+		return nil, err
+	}
+	tar, err := p.parseAssignTargetName()
+	if err != nil {
+		return nil, err
+	}
+	node.Target = tar.Name
+
+	return p.parseImportContext(node, false)
 }
 
 func (p *parser) parseSet() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	lineno := p.stream.Next().Lineno
+	target, err := p.parseAssignTargetNameNamespace()
+	if err != nil {
+		return nil, err
+	}
+	if p.stream.SkipIf(lexer.TokenAssign) {
+		expr, err := p.parseTuple(false, true, nil, false)
+		if err != nil {
+			return nil, err
+		}
+		return &nodes.Assign{
+			Target:     target,
+			Node:       expr,
+			StmtCommon: nodes.StmtCommon{Lineno: lineno},
+		}, nil
+	}
+	filter, err := p.parseFilter(nil, false)
+	if err != nil {
+		return nil, err
+	}
+	if f, ok := (*filter).(*nodes.Filter); ok {
+		body, err := p.parseStatements([]string{"name:endset"}, true)
+		if err != nil {
+			return nil, err
+		}
+		return &nodes.AssignBlock{
+			Target: target,
+			Body:   body,
+			Filter: f,
+			StmtCommon: nodes.StmtCommon{
+				Lineno: lineno,
+			},
+		}, nil
+	}
+	return nil, fmt.Errorf("couldn't parse filter")
 }
 
 func (p *parser) parseWith() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.With{
+		Targets:    make([]nodes.Expr, 0),
+		Values:     make([]nodes.Expr, 0),
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+	}
+
+	for p.stream.Current().Type != lexer.TokenBlockEnd {
+		if len(node.Targets) != 0 {
+			if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
+				return nil, err
+			}
+		}
+		target, err := p.parseAssignTargetTuple(nil)
+		if err != nil {
+			return nil, err
+		}
+		target.SetCtx("param")
+		node.Targets = append(node.Targets, target)
+		if _, err := p.stream.Expect(lexer.TokenAssign); err != nil {
+			return nil, err
+		}
+		expr, err := p.parseExpression(true)
+		if err != nil {
+			return nil, err
+		}
+		node.Values = append(node.Values, expr)
+	}
+
+	var err error
+	node.Body, err = p.parseStatements([]string{"name:endwith"}, true)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (p *parser) parseAutoescape() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.ScopedEvalContextModifier{
+		EvalContextModifier: nodes.EvalContextModifier{
+			Options:    make([]nodes.Keyword, 1),
+			StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+		},
+	}
+	optsExpr, err := p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	node.Options[0] = nodes.Keyword{
+		Key:          "autoescape",
+		Value:        optsExpr,
+		HelperCommon: nodes.HelperCommon{Lineno: optsExpr.GetLineno()},
+	}
+	node.Body, err = p.parseStatements([]string{"name:endautoescape"}, true)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.Scope{
+		Body: []nodes.Node{node},
+	}, nil
 }
 
-func (p *parser) parseCallBlock() ([]nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+func (p *parser) parseCallBlock() (nodes.Node, error) {
+	node := &nodes.CallBlock{StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno}}
+	if p.stream.Current().Type == lexer.TokenLParen {
+		if err := p.parseSignature(&node.MacroCall); err != nil {
+			return nil, err
+		}
+	}
+
+	callNode, err := p.parseExpression(true)
+	if err != nil {
+		return nil, err
+	}
+	if call, ok := callNode.(*nodes.Call); ok {
+		node.Call = *call
+	} else {
+		return nil, p.fail("expected call", &node.Lineno)
+	}
+	node.Body, err = p.parseStatements([]string{"name:endcall"}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }
 
 func (p *parser) parseFilterBlock() (nodes.Node, error) {
-	// TODO
-	panic("not implemented")
+	node := &nodes.FilterBlock{
+		StmtCommon: nodes.StmtCommon{Lineno: p.stream.Next().Lineno},
+	}
+
+	var err error
+	nP, err := p.parseFilter(nil, true)
+	if err != nil {
+		return nil, err
+	}
+	if nP == nil {
+		return nil, fmt.Errorf("couldn't parse filter")
+	}
+	if f, ok := (*nP).(*nodes.Filter); ok {
+		node.Filter = f
+	} else {
+		return nil, fmt.Errorf("couldn't parse filter")
+	}
+
+	node.Body, err = p.parseStatements([]string{"name:endfilter"}, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+func (p *parser) parseAssignTargetName() (target *nodes.Name, err error) {
+	token, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	target = &nodes.Name{
+		Name:       fmt.Sprint(token.Value),
+		Ctx:        "store",
+		ExprCommon: nodes.ExprCommon{Lineno: token.Lineno},
+	}
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
+	}
+
+	return
+}
+
+func (p *parser) parseAssignTargetTuple(extraEndRules []string) (target nodes.Expr, err error) {
+	target, err = p.parseTuple(true, true, extraEndRules, false)
+	target.SetCtx("store")
+
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
+	}
+
+	return
+}
+
+func (p *parser) parseAssignTargetNameNamespace() (target nodes.ExprWithName, err error) {
+	if p.stream.Look().Type == lexer.TokenDot {
+		target, err = p.parseNSRef()
+	} else {
+		target, err = p.parseAssignTargetName()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !target.CanAssign() {
+		lineno := target.GetLineno()
+		return nil, p.fail(fmt.Sprintf("can't assign to %s", reflect.TypeOf(target).Name()), &lineno)
+	}
+
+	return
+}
+
+func (p *parser) parseNSRef() (*nodes.NSRef, error) {
+	token, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	_, err = p.stream.Expect(lexer.TokenDot)
+	if err != nil {
+		return nil, err
+	}
+	attr, err := p.stream.Expect(lexer.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.NSRef{
+		Name:       fmt.Sprint(token.Value),
+		Attr:       fmt.Sprint(attr.Value),
+		ExprCommon: nodes.ExprCommon{Lineno: token.Lineno},
+	}, nil
+}
+
+func (p *parser) parseSignature(n *nodes.MacroCall) error {
+	n.Args = make([]nodes.Name, 0)
+	n.Defaults = make([]nodes.Expr, 0)
+	if _, err := p.stream.Expect(lexer.TokenLParen); err != nil {
+		return err
+	}
+	for p.stream.Current().Type != lexer.TokenRParen {
+		if len(n.Args) != 0 {
+			if _, err := p.stream.Expect(lexer.TokenComma); err != nil {
+				return err
+			}
+		}
+		arg, err := p.parseAssignTargetName()
+		if err != nil {
+			return err
+		}
+		arg.SetCtx("param")
+		if p.stream.SkipIf(lexer.TokenAssign) {
+			expr, err := p.parseExpression(true)
+			if err != nil {
+				return err
+			}
+			n.Defaults = append(n.Defaults, expr)
+		} else if len(n.Defaults) != 0 {
+			return p.fail("non-default argument follows default argument", nil)
+		}
+		n.Args = append(n.Args, *arg)
+	}
+	_, err := p.stream.Expect(lexer.TokenRParen)
+	return err
 }
 
 func (p *parser) fail(msg string, lineno *int) error {
