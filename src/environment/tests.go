@@ -92,7 +92,7 @@ func testDivisibleBy(_ *Environment, f any, values ...any) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("value passed to the test is not an integer")
 	}
-	num, err := getInt(0, values)
+	num, err := getInt(0, values...)
 	if err != nil {
 		return false, err
 	}
@@ -185,10 +185,17 @@ func testNumber(_ *Environment, value any, _ ...any) (bool, error) {
 }
 
 func testSequence(_ *Environment, value any, _ ...any) (bool, error) {
-	return reflect.TypeOf(value).Kind() == reflect.Slice, nil
+	// TODO rewrite using operator len and getitem
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.String:
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 func testCallable(_ *Environment, value any, _ ...any) (bool, error) {
+	// TODO rewrite using operator call
 	return reflect.TypeOf(value).Kind() == reflect.Func, nil
 }
 
@@ -198,7 +205,7 @@ func testSameAs(_ *Environment, value any, values ...any) (bool, error) {
 		return false, fmt.Errorf("not enough values passed to the function")
 	}
 	v2 := values[0]
-	switch reflect.TypeOf(values).Kind() {
+	switch reflect.TypeOf(value).Kind() {
 	case reflect.Bool:
 		return value == v2, nil
 	case reflect.Chan, reflect.Map, reflect.Func, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
@@ -212,7 +219,13 @@ func testSameAs(_ *Environment, value any, values ...any) (bool, error) {
 }
 
 func testIterable(_ *Environment, value any, _ ...any) (bool, error) {
-	return slices.Contains([]reflect.Kind{reflect.Slice, reflect.Map, reflect.Chan}, reflect.TypeOf(value).Kind()), nil
+	// TODO rewrite using operator iter
+	switch reflect.TypeOf(value).Kind() {
+	case reflect.Slice, reflect.Array, reflect.Map, reflect.String, reflect.Chan:
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 type Escaped interface {
@@ -225,6 +238,7 @@ func testEscaped(_ *Environment, value any, _ ...any) (bool, error) {
 }
 
 func testIn(_ *Environment, value any, values ...any) (bool, error) {
+	// TODO rewrite using operator contains
 	if len(values) == 0 {
 		return false, fmt.Errorf("not enough values passed to the function")
 	}
@@ -242,6 +256,12 @@ func testIn(_ *Environment, value any, values ...any) (bool, error) {
 		s := reflect.ValueOf(values[0])
 		v := s.MapIndex(reflect.ValueOf(value))
 		return v != reflect.Value{}, nil
+	case reflect.String:
+		v := values[0].(string)
+		if vS, ok := value.(string); ok {
+			return strings.Contains(v, vS), nil
+		}
+		return false, nil
 	default:
 		return false, fmt.Errorf("second arguemnt is not a slice")
 	}

@@ -6,3 +6,5 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	golang.org/x/exp v0.0.0-20220713135740-79cabaa25d75
 )
+
+require github.com/davecgh/go-spew v1.1.1 // indirect
