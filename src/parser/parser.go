@@ -947,7 +947,7 @@ func (p *parser) parseStatement() ([]nodes.Node, error) {
 			case "autoescape":
 				return wrapInSlice(p.parseAutoescape)
 			default:
-				return nil, fmt.Errorf("unexpected statement keyword '%s'", tokenValue)
+				panic("unexpected statement keyword " + tokenValue)
 			}
 		}
 	}
@@ -1129,7 +1129,7 @@ func (p *parser) parseMacro() (nodes.Node, error) {
 	return n, nil
 }
 
-func (p *parser) parseImportContext(node nodes.StmtWithWithContext, def bool) (nodes.Node, error) {
+func (p *parser) parseImportContext(node nodes.SetWithContexter, def bool) (nodes.Node, error) {
 	if p.stream.Current().TestAny("name:with", "name:without") &&
 		p.stream.Look().Test("name:context") {
 		node.SetWithContext(p.stream.Next().Value == "with")

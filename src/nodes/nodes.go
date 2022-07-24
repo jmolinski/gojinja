@@ -12,7 +12,7 @@ type ExprWithName interface {
 	Expr
 }
 
-type StmtWithWithContext interface {
+type SetWithContexter interface {
 	SetWithContext(bool)
 	Stmt
 }
@@ -572,8 +572,8 @@ var _ Stmt = &AssignBlock{}
 var _ Stmt = &With{}
 var _ Stmt = &For{}
 
-var _ StmtWithWithContext = &Include{}
-var _ StmtWithWithContext = &Import{}
+var _ SetWithContexter = &Include{}
+var _ SetWithContexter = &Import{}
 
 var _ Expr = &BinExpr{}
 var _ Expr = &UnaryExpr{}
