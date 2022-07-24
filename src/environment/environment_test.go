@@ -2,6 +2,6 @@ package environment
 
 import "testing"
 
-func Test(t *testing.T) {
+func TestCompile(t *testing.T) {
 	// Just to compile this module
 }

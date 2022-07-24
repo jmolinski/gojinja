@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-type Undefined struct {
+type BaseUndefined struct {
 	hint   *string
 	obj    any
 	name   *string
@@ -18,28 +18,33 @@ type Undefined struct {
 }
 
 type StrictUndefined struct {
-	Undefined
+	BaseUndefined
 }
 
 type DebugUndefined struct {
-	Undefined
+	BaseUndefined
 }
 
 type ChainableUndefined struct {
-	Undefined
+	BaseUndefined
 }
 
-func (Undefined) Undefined() {}
+func (BaseUndefined) Undefined() {}
 
 type IUndefined interface {
 	Undefined()
 }
 
-func NewUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) Undefined {
+var _ IUndefined = BaseUndefined{}
+var _ IUndefined = StrictUndefined{}
+var _ IUndefined = ChainableUndefined{}
+var _ IUndefined = DebugUndefined{}
+
+func NewUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) BaseUndefined {
 	if exc == nil {
 		exc = errors.TemplateError
 	}
-	return Undefined{hint, obj, name, exc, logger}
+	return BaseUndefined{hint, obj, name, exc, logger}
 }
 
 func NewStrictUndefined(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) StrictUndefined {
@@ -54,7 +59,7 @@ func NewDebugUndefined(hint *string, obj any, name *string, exc func(msg string)
 	return StrictUndefined{NewUndefined(hint, obj, name, exc, logger)}
 }
 
-func (u Undefined) undefinedMessage() string {
+func (u BaseUndefined) undefinedMessage() string {
 	if u.hint != nil {
 		return *u.hint
 	}
@@ -74,13 +79,13 @@ func (u Undefined) undefinedMessage() string {
 	return fmt.Sprintf("'%s' has no attribute '%s'", objectTypeRepr(u.obj), *u.name)
 }
 
-func (u Undefined) logMessage() {
+func (u BaseUndefined) logMessage() {
 	if u.logger != nil {
 		u.logger.Printf("Template variable warning: %s", u.undefinedMessage())
 	}
 }
 
-func (u Undefined) failWithUndefinedError() error {
+func (u BaseUndefined) failWithUndefinedError() error {
 	err := u.exc(u.undefinedMessage())
 	if u.logger != nil {
 		log.Printf("Template variable error: %v", err)
@@ -88,138 +93,138 @@ func (u Undefined) failWithUndefinedError() error {
 	return err
 }
 
-func (u Undefined) Add(any) (any, error) {
+func (u BaseUndefined) Add(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RAdd(any) (any, error) {
+func (u BaseUndefined) RAdd(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Sub(any) (any, error) {
+func (u BaseUndefined) Sub(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RSub(any) (any, error) {
+func (u BaseUndefined) RSub(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Mul(any) (any, error) {
+func (u BaseUndefined) Mul(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RMul(any) (any, error) {
+func (u BaseUndefined) RMul(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Div(any) (any, error) {
+func (u BaseUndefined) Div(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RDiv(any) (any, error) {
+func (u BaseUndefined) RDiv(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) FloorDiv(any) (any, error) {
+func (u BaseUndefined) FloorDiv(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RFloorDiv(any) (any, error) {
+func (u BaseUndefined) RFloorDiv(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Mod(any) (any, error) {
+func (u BaseUndefined) Mod(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RMod(any) (any, error) {
+func (u BaseUndefined) RMod(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Eq(a any) (any, error) {
+func (u BaseUndefined) Eq(a any) (any, error) {
 	return reflect.TypeOf(a).Name() == reflect.TypeOf(u).Name(), nil
 }
 
-func (u Undefined) Ne(a any) (any, error) {
+func (u BaseUndefined) Ne(a any) (any, error) {
 	eq, err := u.Eq(a)
 	return !eq.(bool), err
 }
 
-func (u Undefined) Lt(any) (any, error) {
+func (u BaseUndefined) Lt(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Le(any) (any, error) {
+func (u BaseUndefined) Le(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Gt(any) (any, error) {
+func (u BaseUndefined) Gt(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Ge(any) (any, error) {
+func (u BaseUndefined) Ge(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Pow(any) (any, error) {
+func (u BaseUndefined) Pow(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) RPow(any) (any, error) {
+func (u BaseUndefined) RPow(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Pos() (any, error) {
+func (u BaseUndefined) Pos() (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Neg() (any, error) {
+func (u BaseUndefined) Neg() (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Bool() (bool, error) {
+func (u BaseUndefined) Bool() (bool, error) {
 	u.logMessage()
 	return false, nil
 }
 
-func (Undefined) Repr() string {
-	return "Undefined"
+func (BaseUndefined) Repr() string {
+	return "BaseUndefined"
 }
 
-func (u Undefined) String_() (string, error) {
+func (u BaseUndefined) String_() (string, error) {
 	u.logMessage()
 	return "", nil
 }
 
-func (u Undefined) Len() (int, error) {
+func (u BaseUndefined) Len() (int, error) {
 	return 0, nil
 }
 
-func (u Undefined) Iter() ([]any, error) {
+func (u BaseUndefined) Iter() ([]any, error) {
 	return nil, nil
 }
 
-func (u Undefined) Call(...any) (any, error) {
+func (u BaseUndefined) Call(...any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) GetItem(any) (any, error) {
+func (u BaseUndefined) GetItem(any) (any, error) {
 	return nil, u.failWithUndefinedError()
 }
 
-func (u Undefined) Int(any) (int64, error) {
+func (u BaseUndefined) Int(any) (int64, error) {
 	return 0, u.failWithUndefinedError()
 }
 
-func (u Undefined) Float(any) (int64, error) {
+func (u BaseUndefined) Float(any) (int64, error) {
 	return 0, u.failWithUndefinedError()
 }
 
-func (u Undefined) Complex(any) (int64, error) {
+func (u BaseUndefined) Complex(any) (int64, error) {
 	return 0, u.failWithUndefinedError()
 }
 
-func (u Undefined) Hash() (int64, error) {
+func (u BaseUndefined) Hash() (int64, error) {
 	h, _ := strconv.ParseInt(fmt.Sprintf("%p", &u), 0, 64)
 	return h, nil
 }
