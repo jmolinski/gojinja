@@ -3,6 +3,7 @@ package environment
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gojinja/gojinja/src/filters"
+	"github.com/gojinja/gojinja/src/runtime"
 	"testing"
 )
 
@@ -52,11 +53,25 @@ func TestDivisibleBy(t *testing.T) {
 }
 
 func TestDefined(t *testing.T) {
-	// TODO once Undefined is properly implemented.
+	runTestCases(t, testDefined, []testCase{
+		{nil, 0, nil, true, false},
+		{nil, "", nil, true, false},
+		{nil, runtime.NewUndefined(nil, nil, nil, nil, nil), nil, false, false},
+		{nil, runtime.NewChainableUndefined(nil, nil, nil, nil, nil), nil, false, false},
+		{nil, runtime.NewStrictUndefined(nil, nil, nil, nil, nil), nil, false, false},
+		{nil, runtime.NewDebugUndefined(nil, nil, nil, nil, nil), nil, false, false},
+	})
 }
 
 func TestUndefined(t *testing.T) {
-	// TODO once Undefined is properly implemented.
+	runTestCases(t, testUndefined, []testCase{
+		{nil, 0, nil, false, false},
+		{nil, "", nil, false, false},
+		{nil, runtime.NewUndefined(nil, nil, nil, nil, nil), nil, true, false},
+		{nil, runtime.NewChainableUndefined(nil, nil, nil, nil, nil), nil, true, false},
+		{nil, runtime.NewStrictUndefined(nil, nil, nil, nil, nil), nil, true, false},
+		{nil, runtime.NewDebugUndefined(nil, nil, nil, nil, nil), nil, true, false},
+	})
 }
 
 func testEnv() *Environment {

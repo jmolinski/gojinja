@@ -103,7 +103,7 @@ func testDivisibleBy(_ *Environment, f any, values ...any) (bool, error) {
 }
 
 func testUndefined(_ *Environment, value any, _ ...any) (bool, error) {
-	_, ok := value.(runtime.Undefined)
+	_, ok := value.(runtime.IUndefined)
 	return ok, nil
 }
 
