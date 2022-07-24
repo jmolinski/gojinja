@@ -11,6 +11,7 @@ import (
 	"github.com/gojinja/gojinja/src/utils/maps"
 	"github.com/gojinja/gojinja/src/utils/slices"
 	lru "github.com/hashicorp/golang-lru"
+	"log"
 	"strings"
 )
 
@@ -150,15 +151,15 @@ type EnvOpts struct {
 	AutoReload bool
 }
 
-type UndefinedConstructor func(hint *string, obj any, name *string, exc func(msg string) error) runtime.IUndefined
+type UndefinedConstructor func(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) runtime.IUndefined
 
 func DefaultEnvOpts() *EnvOpts {
 	return &EnvOpts{
 		Optimized:           true,
 		Extensions:          nil,
 		EnvLexerInformation: lexer.DefaultEnvLexerInformation(),
-		Undefined: func(hint *string, obj any, name *string, exc func(msg string) error) runtime.IUndefined {
-			return runtime.NewUndefined(hint, obj, name, exc)
+		Undefined: func(hint *string, obj any, name *string, exc func(msg string) error, logger *log.Logger) runtime.IUndefined {
+			return runtime.NewUndefined(hint, obj, name, exc, logger)
 		},
 		Finalize:   nil,
 		AutoEscape: false,

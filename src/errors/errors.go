@@ -11,3 +11,7 @@ func TemplateSyntaxError(msg string, lineno int, name *string, filename *string)
 	// TODO real implementation
 	return fmt.Errorf("TEMPLATE SYNTAX ERROR %s %d", msg, lineno)
 }
+
+func TemplateError(msg string) error {
+	return fmt.Errorf("TEMPLATE ERROR: %s", msg)
+}
